@@ -5,7 +5,7 @@ from pathlib import Path
 from playwright.sync_api import Page
 
 from ebay_automation.components.base import BaseComponent
-from ebay_automation.utils.currency import parse_price
+from ebay_automation.utils.price_parser import parse_price
 
 
 class CartPage(BaseComponent):

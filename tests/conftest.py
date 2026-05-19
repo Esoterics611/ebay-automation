@@ -12,7 +12,7 @@ from ebay_automation.db.models import Environment
 from ebay_automation.services.auth import AuthService
 from ebay_automation.services.cart import CartService
 from ebay_automation.services.search import SearchService
-from ebay_automation.services.variants import VariantsService
+from ebay_automation.services.variants import VariantService
 from ebay_automation.utils.logger import get_logger
 from ebay_automation.utils.screenshot import ScreenshotManager
 
@@ -28,10 +28,10 @@ class Services:
     auth: AuthService
     search: SearchService
     cart: CartService
-    variants: VariantsService
+    variants: VariantService
 
 
-# ---------- session-scoped config ----------
+# ---------- session-scoped config (browser-free) ----------
 
 @pytest.fixture(scope="session")
 def profile() -> str:
@@ -81,11 +81,22 @@ def browser_context_args(
 
 
 # ---------- per-test setup ----------
+#
+# These autouse fixtures are gated on ``request.fixturenames`` so that
+# unit tests under ``tests/unit/`` — which never request ``page`` or
+# ``context`` — do not pay the cost of launching a browser.
+
+def _uses_browser(request: pytest.FixtureRequest) -> bool:
+    names = request.fixturenames
+    return "page" in names or "context" in names
+
 
 @pytest.fixture(autouse=True)
-def _set_region_cookies(context: BrowserContext, env: Environment):
-    # Region/currency cookies — names are illustrative; tune for the live
-    # eBay cookie names per region (gh_eu, prefercc, etc.).
+def _set_region_cookies(request: pytest.FixtureRequest, env: Environment):
+    if not _uses_browser(request):
+        yield
+        return
+    context: BrowserContext = request.getfixturevalue("context")
     context.add_cookies(
         [
             {
@@ -106,14 +117,11 @@ def _set_region_cookies(context: BrowserContext, env: Environment):
 
 
 @pytest.fixture(autouse=True)
-def _tracing(
-    context: BrowserContext,
-    env: Environment,
-    request: pytest.FixtureRequest,
-):
-    if env.trace == "off":
+def _tracing(request: pytest.FixtureRequest, env: Environment):
+    if not _uses_browser(request) or env.trace == "off":
         yield
         return
+    context: BrowserContext = request.getfixturevalue("context")
     context.tracing.start(screenshots=True, snapshots=True, sources=True)
     try:
         yield
@@ -137,12 +145,10 @@ def screenshots(page: Page, request: pytest.FixtureRequest) -> ScreenshotManager
 
 
 @pytest.fixture(autouse=True)
-def _screenshot_on_failure(
-    page: Page,
-    env: Environment,
-    request: pytest.FixtureRequest,
-    screenshots: ScreenshotManager,
-):
+def _screenshot_on_failure(request: pytest.FixtureRequest, env: Environment):
+    if "page" not in request.fixturenames:
+        yield
+        return
     yield
     failed = bool(
         getattr(request.node, "rep_call", None)
@@ -150,20 +156,21 @@ def _screenshot_on_failure(
     )
     if failed and env.screenshot_on_failure:
         try:
-            screenshots.capture("failure")
+            request.getfixturevalue("screenshots").capture("failure")
         except Exception as exc:  # noqa: BLE001 — best-effort capture
             _LOG.warning("failed to capture failure screenshot: %s", exc)
 
 
-# ---------- services ----------
+# ---------- services (constructor injection from fixtures) ----------
 
 @pytest.fixture
-def services(page: Page) -> Services:
+def services(page: Page, context: BrowserContext, env: Environment) -> Services:
+    variant_service = VariantService(page)
     return Services(
-        auth=AuthService(page),
-        search=SearchService(page),
-        cart=CartService(page),
-        variants=VariantsService(page),
+        auth=AuthService(page, context, env),
+        search=SearchService(page, env),
+        variants=variant_service,
+        cart=CartService(page, context, variant_service),
     )
 
 
