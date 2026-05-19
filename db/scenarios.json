@@ -1,0 +1,42 @@
+{
+  "smoke-usb-cables": {
+    "name": "USB cables under $10",
+    "query": "usb cable",
+    "max_price": "10.00",
+    "limit": 3,
+    "allow_partial": true,
+    "tags": ["smoke"]
+  },
+  "smoke-paperbacks": {
+    "name": "Paperback novels under $15",
+    "query": "paperback novel",
+    "max_price": "15.00",
+    "limit": 5,
+    "allow_partial": true,
+    "tags": ["smoke"]
+  },
+  "regression-bluetooth-speakers": {
+    "name": "Bluetooth speakers under $50",
+    "query": "bluetooth speaker",
+    "max_price": "50.00",
+    "limit": 10,
+    "allow_partial": false,
+    "tags": ["regression"]
+  },
+  "regression-vintage-postcards": {
+    "name": "Vintage postcards under $20",
+    "query": "vintage postcard",
+    "max_price": "20.00",
+    "limit": 15,
+    "allow_partial": true,
+    "tags": ["regression"]
+  },
+  "regression-leather-wallets": {
+    "name": "Leather wallets under $30",
+    "query": "leather wallet",
+    "max_price": "30.00",
+    "limit": 8,
+    "allow_partial": false,
+    "tags": ["regression"]
+  }
+}

@@ -1,14 +1,24 @@
 {
   "dev": {
     "base_url": "https://www.ebay.com",
-    "default_timeout_ms": 30000
+    "region": "US",
+    "currency": "USD",
+    "headless": false,
+    "slow_mo_ms": 100,
+    "trace": "retain-on-failure",
+    "video": "retain-on-failure",
+    "screenshot_on_failure": true,
+    "max_pages_to_paginate": 5
   },
-  "staging": {
+  "ci": {
     "base_url": "https://www.ebay.com",
-    "default_timeout_ms": 30000
-  },
-  "prod": {
-    "base_url": "https://www.ebay.com",
-    "default_timeout_ms": 20000
+    "region": "US",
+    "currency": "USD",
+    "headless": true,
+    "slow_mo_ms": 0,
+    "trace": "retain-on-failure",
+    "video": "retain-on-failure",
+    "screenshot_on_failure": true,
+    "max_pages_to_paginate": 3
   }
 }

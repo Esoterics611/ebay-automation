@@ -1,0 +1,27 @@
+{
+  "smoke-usb-cables": {
+    "min_results": 1,
+    "all_under_budget": true,
+    "max_acceptable_total_pct": "100.0"
+  },
+  "smoke-paperbacks": {
+    "min_results": 2,
+    "all_under_budget": true,
+    "max_acceptable_total_pct": "100.0"
+  },
+  "regression-bluetooth-speakers": {
+    "min_results": 10,
+    "all_under_budget": true,
+    "max_acceptable_total_pct": "100.0"
+  },
+  "regression-vintage-postcards": {
+    "min_results": 5,
+    "all_under_budget": true,
+    "max_acceptable_total_pct": "100.0"
+  },
+  "regression-leather-wallets": {
+    "min_results": 8,
+    "all_under_budget": true,
+    "max_acceptable_total_pct": "100.0"
+  }
+}

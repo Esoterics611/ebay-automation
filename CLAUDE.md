@@ -20,24 +20,30 @@
 
 ```
 ebay-automation/
-├── conftest.py              # session fixtures: browser, base_url, env_config
-├── pytest.ini
 ├── pyproject.toml
+├── pytest.ini
 ├── .env.example
-├── db/
-│   └── environments.json   # base_url, timeouts per PROFILE
-├── tests/
-│   ├── smoke/
-│   ├── regression/
-│   └── slow/
-├── components/             # Page-Object layer (Playwright interactions only)
-│   ├── base.py
-│   ├── header/
-│   ├── search/
-│   └── listing/
-├── services/               # Business-logic layer (orchestrates components)
-└── utils/
-    └── config.py           # loads db/environments.json via PROFILE env var
+├── atlas/                       # architecture & spec documentation
+│   ├── PAGES.md                 # URL patterns, roles, dynamic behaviors
+│   ├── FLOWS.md                 # E2E flow specification
+│   ├── SELECTORS.md             # selector strategy & priority
+│   └── EDGE_CASES.md            # cookie banners, geo, variants, currency …
+├── db/                          # JSON store (config + scenario data)
+│   ├── environments.json        # per-profile browser/runtime config
+│   ├── scenarios.json           # parameterised scenarios for the suites
+│   ├── expectations.json        # pass criteria per scenario id
+│   └── demo_scenarios.json      # curated showcase scenarios
+├── src/
+│   └── ebay_automation/
+│       ├── db/                  # TestDatabase + dataclass models
+│       ├── utils/               # logger, ScreenshotManager
+│       ├── components/          # Page-Object layer (BaseComponent + regions)
+│       └── services/            # Business-logic layer (auth, search, cart, variants)
+└── tests/
+    ├── conftest.py              # session fixtures: db, env, services, tracing
+    ├── smoke/
+    ├── regression/
+    └── slow/
 ```
 
 ---
@@ -52,7 +58,7 @@ tests  →  services  →  components  →  playwright
 
 - **Tests** call service methods and assert on return values / page state.
 - **Services** own all business logic; they compose component calls into
-  meaningful actions (e.g. `SearchService.find_cheapest_listing`).
+  meaningful actions (e.g. `SearchService.find_listings_under_budget`).
 - **Components** wrap a single UI region. They know selectors and expose
   intent-revealing methods. They never contain business logic.
 - **Playwright** (`page.*`) is called **only** inside components.
@@ -62,34 +68,36 @@ tests  →  services  →  components  →  playwright
 | Rule | Reason |
 |---|---|
 | No selectors in test files | Couples tests to markup; breaks en masse on redesign |
-| No `time.sleep()` anywhere | Race conditions; use `expect(locator).to_be_visible()` or `page.wait_for_*` |
+| No `time.sleep()` anywhere | Race conditions; use `expect(locator).to_…()` or `page.wait_for_*` |
 | `Decimal` for all money values | Float rounding errors corrupt price comparisons |
 | No hardcoded URLs in tests | All base URLs come from `db/environments.json` via `PROFILE` |
-| Secrets in `.env` only | Structural config in `db/environments.json`; credentials never in JSON |
+| Secrets in `.env` only | Structural config in `db/*.json`; credentials never in JSON |
 
 ### Component conventions
 
-- One class per UI region, file name matches class name in snake_case.
-- Constructor signature: `__init__(self, page: Page) -> None`.
-- Extend `BaseComponent` (components/base.py).
+- One class per UI region.
+- Constructor signature: `__init__(self, page: Page, root: Locator | None = None)`.
+- Extend `BaseComponent` (`src/ebay_automation/components/base.py`).
 - Selector strings live as class-level constants prefixed `_SEL_`.
+- Use the scoped `self.locator(...)` factory rather than raw
+  `self.page.locator(...)` whenever the component has a non-default root.
 
 ### Service conventions
 
-- One service class per domain area (search, cart, account, …).
-- Services receive the `page` object at construction; never import components
-  from other services.
-- Return domain objects or primitives, not `Locator` instances.
+- One service class per domain area (search, cart, variants, auth).
+- Services receive the `page` object at construction; never import a
+  service from another service.
+- Return domain values or dataclasses, not `Locator` instances.
 
 ### Naming
 
 | Thing | Convention | Example |
 |---|---|---|
 | Test file | `test_<what>.py` | `test_search_results.py` |
-| Test function | `test_<scenario>` | `test_search_by_keyword_returns_results` |
+| Test function | `test_<scenario>` | `test_search_under_budget_caps_subtotal` |
 | Component class | `<Region>Component` | `SearchBarComponent` |
 | Service class | `<Domain>Service` | `SearchService` |
-| Selector constant | `_SEL_<ELEMENT>` | `_SEL_SEARCH_INPUT` |
+| Selector constant | `_SEL_<ELEMENT>` | `_SEL_SEARCH_INPUT_NAME` |
 
 ---
 
@@ -101,6 +109,7 @@ tests  →  services  →  components  →  playwright
 - Importing a component directly inside another component.
 - `assert "text" in page.content()` — use locator assertions.
 - Ignoring the `PROFILE` env var and hardcoding environment URLs.
+- `float(price)` — always `Decimal`.
 
 ---
 
@@ -113,11 +122,11 @@ uv sync
 # Install Playwright browsers (first time)
 uv run playwright install chromium
 
-# Smoke suite
+# Smoke suite (dev profile, headed)
 uv run pytest -m smoke
 
-# Full regression, 4 workers, with Allure
-uv run pytest -m regression -n 4
+# Full regression, 4 workers, CI profile, headless
+PROFILE=ci uv run pytest -m regression -n 4
 
 # Generate & open Allure report
 uvx allure generate allure-results -o allure-report --clean
@@ -131,5 +140,7 @@ uv run black --check .
 Switch environments by setting `PROFILE` in `.env` or inline:
 
 ```bash
-PROFILE=staging uv run pytest -m smoke
+PROFILE=ci uv run pytest -m smoke
 ```
+
+Profiles are defined in `db/environments.json` (currently `dev` and `ci`).
