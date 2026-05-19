@@ -1,0 +1,14 @@
+{
+  "dev": {
+    "base_url": "https://www.ebay.com",
+    "default_timeout_ms": 30000
+  },
+  "staging": {
+    "base_url": "https://www.ebay.com",
+    "default_timeout_ms": 30000
+  },
+  "prod": {
+    "base_url": "https://www.ebay.com",
+    "default_timeout_ms": 20000
+  }
+}
