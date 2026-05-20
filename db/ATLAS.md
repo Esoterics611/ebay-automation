@@ -7,10 +7,9 @@ dataclasses in `ebay_automation.db.models`.
 | File | Schema | Purpose |
 |---|---|---|
 | `environments.json` | `Environment` | Per-profile (`dev`, `ci`) browser + runtime config |
-| `scenarios.json` | `Scenario` | Parameterised scenarios driving the regression / smoke suites |
-| `expectations.json` | `Expectation` | Pass criteria per scenario id |
+| `scenarios.json` | `Scenario` | Parameterised scenarios driving the regression / smoke suites; each carries its own `min_results` |
 | `demo_scenarios.json` | `DemoScenario` | Curated showcase scenarios with narrative copy |
 
 **Never put secrets here.** Secrets belong in `.env` (gitignored). Money
-fields (`max_price`, `max_acceptable_total_pct`) are stored as **strings**
-and parsed to `Decimal` on load — never floats.
+fields (`max_price`) are stored as **strings** and parsed to `Decimal`
+on load — never floats.

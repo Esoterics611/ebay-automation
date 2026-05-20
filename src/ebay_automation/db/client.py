@@ -2,98 +2,96 @@ import json
 from dataclasses import fields, is_dataclass
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, Generic, TypeVar
+from typing import Any
 
-from ebay_automation.db.models import DemoScenario, Environment, Expectation, Scenario
+from ebay_automation.db.models import DemoScenario, Environment, Scenario
 
-T = TypeVar("T")
-
-_DECIMAL_FIELDS: frozenset[str] = frozenset({"max_price", "max_acceptable_total_pct"})
+_DECIMAL_FIELDS = frozenset({"max_price"})
 
 
-class Accessor(Generic[T]):
-    def __init__(self, items: dict[str, T]) -> None:
-        self._items = items
-
-    def get(self, id: str) -> T:
-        if id not in self._items:
-            raise KeyError(
-                f"id '{id}' not found. Available: {sorted(self._items)}"
-            )
-        return self._items[id]
-
-    def all(self) -> list[T]:
-        return list(self._items.values())
-
-    def where(self, **filters: Any) -> list[T]:
-        def matches(item: T) -> bool:
-            for key, value in filters.items():
-                attr = getattr(item, key, None)
-                if attr is None and hasattr(item, key + "s"):
-                    attr = getattr(item, key + "s")
-                if isinstance(attr, list):
-                    if value not in attr:
-                        return False
-                elif attr != value:
-                    return False
-            return True
-
-        return [item for item in self._items.values() if matches(item)]
-
-
-class TestDatabase:
-    def __init__(self, db_path: str | Path) -> None:
-        self.db_path = Path(db_path)
-        if not self.db_path.is_dir():
-            raise FileNotFoundError(f"db path is not a directory: {self.db_path}")
-        self._cache: dict[str, dict[str, Any]] = {}
-        self._environments = self._build(Environment, "environments.json")
-        self._scenarios = self._build(Scenario, "scenarios.json")
-        self._expectations = self._build(Expectation, "expectations.json")
-        self._demos = self._build(DemoScenario, "demo_scenarios.json")
-
-    @property
-    def environments(self) -> Accessor[Environment]:
-        return self._environments
-
-    @property
-    def scenarios(self) -> Accessor[Scenario]:
-        return self._scenarios
-
-    @property
-    def expectations(self) -> Accessor[Expectation]:
-        return self._expectations
-
-    @property
-    def demos(self) -> Accessor[DemoScenario]:
-        return self._demos
-
-    def _read(self, name: str) -> dict[str, Any]:
-        if name not in self._cache:
-            self._cache[name] = json.loads((self.db_path / name).read_text())
-        return self._cache[name]
-
-    def _build(self, model: type, name: str) -> Accessor:
-        raw = self._read(name)
-        items = {id_: _load_model(model, id_, payload) for id_, payload in raw.items()}
-        return Accessor(items)
-
-
-def _load_model(model: type, id_: str, payload: dict[str, Any]) -> Any:
+def _load_model(model: type, id_: str, payload: dict[str, Any]):
     if not is_dataclass(model):
         raise TypeError(f"{model.__name__} is not a dataclass")
     kwargs: dict[str, Any] = {"id": id_}
     for f in fields(model):
-        if f.name == "id":
+        if f.name == "id" or f.name not in payload:
             continue
-        if f.name in payload:
-            value = payload[f.name]
-            if f.name in _DECIMAL_FIELDS:
-                value = Decimal(str(value))
-            kwargs[f.name] = value
+        value = payload[f.name]
+        if f.name in _DECIMAL_FIELDS:
+            value = Decimal(str(value))
+        kwargs[f.name] = value
     try:
         return model(**kwargs)
     except TypeError as exc:
         raise ValueError(
             f"Invalid {model.__name__} for id '{id_}': {exc}. Payload: {payload}"
         ) from exc
+
+
+def _load_all(model: type, path: Path) -> dict:
+    raw = json.loads(path.read_text())
+    return {id_: _load_model(model, id_, payload) for id_, payload in raw.items()}
+
+
+class EnvironmentAccessor:
+    def __init__(self, items: dict[str, Environment]) -> None:
+        self._items = items
+    def get(self, id: str) -> Environment:
+        if id not in self._items:
+            raise KeyError(f"environment '{id}' not found. Available: {sorted(self._items)}")
+        return self._items[id]
+    def all(self) -> list[Environment]:
+        return list(self._items.values())
+
+
+class ScenarioAccessor:
+    def __init__(self, items: dict[str, Scenario]) -> None:
+        self._items = items
+    def get(self, id: str) -> Scenario:
+        if id not in self._items:
+            raise KeyError(f"scenario '{id}' not found. Available: {sorted(self._items)}")
+        return self._items[id]
+    def all(self) -> list[Scenario]:
+        return list(self._items.values())
+    def where(self, tag: str) -> list[Scenario]:
+        return [s for s in self._items.values() if tag in s.tags]
+
+
+class DemoScenarioAccessor:
+    def __init__(self, items: dict[str, DemoScenario]) -> None:
+        self._items = items
+    def get(self, id: str) -> DemoScenario:
+        if id not in self._items:
+            raise KeyError(f"demo '{id}' not found. Available: {sorted(self._items)}")
+        return self._items[id]
+    def all(self) -> list[DemoScenario]:
+        return list(self._items.values())
+    def where(self, tag: str) -> list[DemoScenario]:
+        return [d for d in self._items.values() if tag in getattr(d, "tags", [])]
+
+
+class TestDatabase:
+    __test__ = False  # not a pytest test class despite the "Test" prefix
+
+    def __init__(self, db_path: str | Path) -> None:
+        self.db_path = Path(db_path)
+        if not self.db_path.is_dir():
+            raise FileNotFoundError(f"db path is not a directory: {self.db_path}")
+        env_path = self.db_path / "environments.json"
+        sce_path = self.db_path / "scenarios.json"
+        dem_path = self.db_path / "demo_scenarios.json"
+        self._environments = EnvironmentAccessor(_load_all(Environment, env_path))
+        self._scenarios = ScenarioAccessor(_load_all(Scenario, sce_path))
+        self._demos = DemoScenarioAccessor(_load_all(DemoScenario, dem_path))
+
+    @property
+    def environments(self) -> EnvironmentAccessor:
+        return self._environments
+
+    @property
+    def scenarios(self) -> ScenarioAccessor:
+        return self._scenarios
+
+    @property
+    def demos(self) -> DemoScenarioAccessor:
+        return self._demos

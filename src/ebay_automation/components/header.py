@@ -19,8 +19,12 @@ class HeaderComponent(BaseComponent):
     def __init__(self, page: Page, root: Locator | None = None) -> None:
         super().__init__(page, root if root is not None else page.get_by_role("banner"))
 
+    @property
+    def search_input(self) -> Locator:
+        return self.root.get_by_role("combobox", name=self._SEL_SEARCH_INPUT_NAME)
+
     def search(self, query: str) -> None:
-        self.root.get_by_role("combobox", name=self._SEL_SEARCH_INPUT_NAME).fill(query)
+        self.search_input.fill(query)
         self.root.get_by_role("button", name=self._SEL_SEARCH_SUBMIT_NAME).click()
 
     def open_cart(self) -> None:

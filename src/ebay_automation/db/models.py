@@ -24,15 +24,8 @@ class Scenario:
     max_price: Decimal
     limit: int
     allow_partial: bool
+    min_results: int = 1
     tags: list[str] = field(default_factory=list)
-
-
-@dataclass(frozen=True)
-class Expectation:
-    id: str
-    min_results: int
-    all_under_budget: bool
-    max_acceptable_total_pct: Decimal
 
 
 @dataclass(frozen=True)

@@ -4,6 +4,7 @@
     "query": "usb cable",
     "max_price": "10.00",
     "limit": 3,
+    "min_results": 1,
     "allow_partial": true,
     "tags": ["smoke"]
   },
@@ -12,6 +13,7 @@
     "query": "paperback novel",
     "max_price": "15.00",
     "limit": 5,
+    "min_results": 2,
     "allow_partial": true,
     "tags": ["smoke"]
   },
@@ -20,6 +22,7 @@
     "query": "bluetooth speaker",
     "max_price": "50.00",
     "limit": 10,
+    "min_results": 10,
     "allow_partial": false,
     "tags": ["regression"]
   },
@@ -28,6 +31,7 @@
     "query": "vintage postcard",
     "max_price": "20.00",
     "limit": 15,
+    "min_results": 5,
     "allow_partial": true,
     "tags": ["regression"]
   },
@@ -36,6 +40,7 @@
     "query": "leather wallet",
     "max_price": "30.00",
     "limit": 8,
+    "min_results": 8,
     "allow_partial": false,
     "tags": ["regression"]
   }

@@ -1,7 +1,7 @@
 from decimal import Decimal
 from urllib.parse import urlencode
 
-from playwright.sync_api import Page
+from playwright.sync_api import Locator, Page
 
 from ebay_automation.components.base import BaseComponent
 from ebay_automation.components.filter_panel import FilterPanelComponent
@@ -23,8 +23,12 @@ class SearchResultsPage(BaseComponent):
         qs = urlencode({"_nkw": query})
         self.page.goto(f"{self.URL_PATH}?{qs}")
 
+    @property
+    def cards(self) -> Locator:
+        return self.page.locator(self._SEL_CARDS_CSS)
+
     def get_visible_result_cards(self) -> list[ResultCardComponent]:
-        cards = self.page.locator(self._SEL_CARDS_CSS)
+        cards = self.cards
         # List comprehension is a structural child-factory, not business
         # logic — each card is wrapped as its own typed sub-component.
         return [ResultCardComponent(self.page, cards.nth(i)) for i in range(cards.count())]

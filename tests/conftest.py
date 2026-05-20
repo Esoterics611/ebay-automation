@@ -1,5 +1,4 @@
 import os
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -21,14 +20,6 @@ load_dotenv()
 _LOG = get_logger("conftest")
 _ROOT = Path(__file__).resolve().parent.parent
 _DB_PATH = _ROOT / "db"
-
-
-@dataclass
-class Services:
-    auth: AuthService
-    search: SearchService
-    cart: CartService
-    variants: VariantService
 
 
 # ---------- session-scoped config (browser-free) ----------
@@ -72,6 +63,7 @@ def browser_context_args(
 ) -> dict[str, Any]:
     args: dict[str, Any] = {
         **browser_context_args,
+        "base_url": env.base_url,
         "locale": f"en-{env.region}",
         "viewport": {"width": 1440, "height": 900},
     }
@@ -164,14 +156,38 @@ def _screenshot_on_failure(request: pytest.FixtureRequest, env: Environment):
 # ---------- services (constructor injection from fixtures) ----------
 
 @pytest.fixture
-def services(page: Page, context: BrowserContext, env: Environment) -> Services:
-    variant_service = VariantService(page)
-    return Services(
-        auth=AuthService(page, context, env),
-        search=SearchService(page, env),
-        variants=variant_service,
-        cart=CartService(page, context, variant_service),
-    )
+def variant_service(page: Page) -> VariantService:
+    return VariantService(page)
+
+
+@pytest.fixture
+def auth_service(
+    page: Page, context: BrowserContext, env: Environment
+) -> AuthService:
+    return AuthService(page, context, env)
+
+
+@pytest.fixture
+def search_service(page: Page, env: Environment) -> SearchService:
+    return SearchService(page, env)
+
+
+@pytest.fixture
+def cart_service(
+    page: Page,
+    context: BrowserContext,
+    variant_service: VariantService,
+) -> CartService:
+    return CartService(page, context, variant_service)
+
+
+# ---------- data-driven scenarios ----------
+
+def pytest_generate_tests(metafunc: pytest.Metafunc) -> None:
+    if "scenario" in metafunc.fixturenames:
+        db = TestDatabase(_DB_PATH)
+        scenarios = db.scenarios.where(tag="regression")
+        metafunc.parametrize("scenario", scenarios, ids=lambda s: s.id)
 
 
 # ---------- hooks ----------
