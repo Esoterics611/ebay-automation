@@ -26,6 +26,15 @@ dev = [
 [tool.hatch.build.targets.wheel]
 packages = ["src/ebay_automation"]
 
+[tool.pytest.ini_options]
+addopts = "--alluredir=allure-results -ra --tracing=retain-on-failure --video=retain-on-failure --screenshot=only-on-failure"
+testpaths = ["tests"]
+markers = [
+    "smoke: Fast critical-path tests — run before every deploy",
+    "regression: Full regression suite — run nightly",
+    "slow: Long-running tests (>30 s) — run in dedicated pipeline",
+]
+
 [tool.ruff]
 line-length = 100
 target-version = "py311"

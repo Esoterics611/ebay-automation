@@ -1,4 +1,6 @@
 import os
+import sys
+from importlib.metadata import version as _pkg_version
 from pathlib import Path
 from typing import Any
 
@@ -20,6 +22,7 @@ load_dotenv()
 _LOG = get_logger("conftest")
 _ROOT = Path(__file__).resolve().parent.parent
 _DB_PATH = _ROOT / "db"
+_ALLURE_RESULTS = _ROOT / "allure-results"
 
 
 # ---------- session-scoped config (browser-free) ----------
@@ -61,21 +64,45 @@ def browser_type_launch_args(
 def browser_context_args(
     browser_context_args: dict[str, Any], env: Environment
 ) -> dict[str, Any]:
-    args: dict[str, Any] = {
+    # Tracing, video and screenshot capture are driven by pytest-playwright
+    # CLI flags (see pyproject [tool.pytest.ini_options] addopts) — do not
+    # reimplement context-level tracing.start here.
+    return {
         **browser_context_args,
         "base_url": env.base_url,
         "locale": f"en-{env.region}",
         "viewport": {"width": 1440, "height": 900},
     }
-    if env.video != "off":
-        args["record_video_dir"] = str(_ROOT / "reports" / "videos")
-    return args
+
+
+# ---------- allure environment.properties (session-scoped, autouse) ----------
+
+@pytest.fixture(scope="session", autouse=True)
+def _allure_environment(env: Environment, profile: str) -> None:
+    """Write ``allure-results/environment.properties`` so the Allure
+    report's Environment panel shows the run profile, base URL, region
+    and component versions."""
+    _ALLURE_RESULTS.mkdir(parents=True, exist_ok=True)
+    py_ver = ".".join(str(p) for p in sys.version_info[:3])
+    try:
+        pw_ver = _pkg_version("playwright")
+    except Exception:  # noqa: BLE001 — best-effort version probe
+        pw_ver = "unknown"
+    lines = [
+        f"python.version={py_ver}",
+        f"playwright.version={pw_ver}",
+        f"profile={profile}",
+        f"base_url={env.base_url}",
+        f"region={env.region}",
+        f"headless={env.headless}",
+    ]
+    (_ALLURE_RESULTS / "environment.properties").write_text("\n".join(lines) + "\n")
 
 
 # ---------- per-test setup ----------
 #
-# These autouse fixtures are gated on ``request.fixturenames`` so that
-# unit tests under ``tests/unit/`` — which never request ``page`` or
+# Autouse fixtures are gated on ``request.fixturenames`` so that unit
+# tests under ``tests/unit/`` — which never request ``page`` or
 # ``context`` — do not pay the cost of launching a browser.
 
 def _uses_browser(request: pytest.FixtureRequest) -> bool:
@@ -108,49 +135,9 @@ def _set_region_cookies(request: pytest.FixtureRequest, env: Environment):
     yield
 
 
-@pytest.fixture(autouse=True)
-def _tracing(request: pytest.FixtureRequest, env: Environment):
-    if not _uses_browser(request) or env.trace == "off":
-        yield
-        return
-    context: BrowserContext = request.getfixturevalue("context")
-    context.tracing.start(screenshots=True, snapshots=True, sources=True)
-    try:
-        yield
-    finally:
-        failed = bool(
-            getattr(request.node, "rep_call", None)
-            and request.node.rep_call.failed
-        )
-        keep = env.trace == "on" or (env.trace == "retain-on-failure" and failed)
-        if keep:
-            out = _ROOT / "reports" / "traces" / f"{_safe_id(request.node.nodeid)}.zip"
-            out.parent.mkdir(parents=True, exist_ok=True)
-            context.tracing.stop(path=str(out))
-        else:
-            context.tracing.stop()
-
-
 @pytest.fixture
 def screenshots(page: Page, request: pytest.FixtureRequest) -> ScreenshotManager:
     return ScreenshotManager(page, test_id=_safe_id(request.node.nodeid))
-
-
-@pytest.fixture(autouse=True)
-def _screenshot_on_failure(request: pytest.FixtureRequest, env: Environment):
-    if "page" not in request.fixturenames:
-        yield
-        return
-    yield
-    failed = bool(
-        getattr(request.node, "rep_call", None)
-        and request.node.rep_call.failed
-    )
-    if failed and env.screenshot_on_failure:
-        try:
-            request.getfixturevalue("screenshots").capture("failure")
-        except Exception as exc:  # noqa: BLE001 — best-effort capture
-            _LOG.warning("failed to capture failure screenshot: %s", exc)
 
 
 # ---------- services (constructor injection from fixtures) ----------
