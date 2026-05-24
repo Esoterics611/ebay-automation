@@ -11,7 +11,7 @@ import allure
 from playwright.sync_api import sync_playwright
 
 from ebay_automation.db.client import TestDatabase
-from ebay_automation.services.cart import CartService
+from ebay_automation.services.cart import CartService, CartUnavailableError
 from ebay_automation.services.search import SearchService
 from ebay_automation.services.variants import VariantService
 
@@ -53,7 +53,13 @@ def main() -> None:
                     print(f"  no urls; skipping {demo.id}")
                     continue
                 cart.add_items_to_cart(urls)
-                cart.assert_cart_total_not_exceeds(demo.max_price, len(urls))
+                try:
+                    cart.assert_cart_total_not_exceeds(demo.max_price, len(urls))
+                except CartUnavailableError as e:
+                    # Environmental block (e.g. /cart 404 during IL
+                    # shipping pause); demo continues — the add-to-cart
+                    # pipeline has already been exercised end-to-end.
+                    print(f"  cart subtotal skipped: {e}")
         context.close()
         browser.close()
     subprocess.run(
@@ -61,7 +67,7 @@ def main() -> None:
         check=False,
     )
     print(f"\nDemo report: file://{_ROOT / 'allure-report' / 'index.html'}")
-    print("Or: uv run allure serve allure-results")
+    print("Or: allure serve allure-results  (allure CLI installed by scripts/init_env.sh)")
 
 
 if __name__ == "__main__":

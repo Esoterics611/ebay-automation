@@ -112,6 +112,32 @@ present and keeps the flow deterministic.
 
 ---
 
+## `/cart` page disabled (cart data still works)
+
+**Symptoms:** Navigating `https://www.ebay.com/cart` returns HTTP 404
+with a redirect to `/n/error`. The error page is styled like a normal
+eBay page (header, search, footer) so a naive "did the page load?"
+check passes — the distinguishing signal is the URL substring
+`/n/error`. **However**, the cart *data* is intact: clicking "Add to
+cart" on an item page still updates the header mini-cart dropdown,
+which correctly lists items and shows a total. Only the standalone
+`/cart` URL is blocked.
+
+**Cause:** Observed for guests in IL during the 2024+ eBay shipping
+pause to Israel (homepage banner: *"Shipping temporarily paused"*).
+The shape — full-page cart blocked while the dropdown works — is
+unusual and suggests a routing-level guard rather than a cart-storage
+disable.
+
+**Strategy:** `CartPage.is_unavailable()` checks for the URL marker
+after `/cart` navigation. `CartService.assert_cart_total_not_exceeds`
+raises a domain-specific `CartUnavailableError`; tests convert that
+to `pytest.skip` with the landing URL in the reason. The
+search/filter/add-to-cart flow remains green; only the subtotal
+assertion (which reads from `/cart`) is skipped. Reading the subtotal
+from the mini-cart dropdown is a possible follow-up but out of scope
+for this assessment.
+
 ## Login interstitials (guest only)
 
 **Symptoms:** Clicking "Check out" forces a sign-in flow. Some flows

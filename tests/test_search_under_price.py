@@ -4,7 +4,7 @@ import allure
 import pytest
 
 from ebay_automation.services.auth import AuthService
-from ebay_automation.services.cart import CartService
+from ebay_automation.services.cart import CartService, CartUnavailableError
 from ebay_automation.services.search import SearchService
 from ebay_automation.utils.screenshot import ScreenshotManager
 
@@ -33,7 +33,14 @@ def test_full_e2e_search_add_assert(
         cart_service.add_items_to_cart(urls)
 
     with allure.step("ASSERT_TOTAL"):
-        cart_service.assert_cart_total_not_exceeds(Decimal("640"), len(urls))
+        try:
+            cart_service.assert_cart_total_not_exceeds(Decimal("640"), len(urls))
+        except CartUnavailableError as e:
+            # Environmental block (e.g. eBay paused shipping to this
+            # region → guest cart disabled). Surface clearly; do not
+            # silently pass. See README §Assumptions and the
+            # flake-triage skill (bucket 1: ENVIRONMENT).
+            pytest.skip(str(e))
         path = screenshots.capture("cart")
         allure.attach.file(
             str(path),

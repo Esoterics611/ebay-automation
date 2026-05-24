@@ -206,8 +206,13 @@ tempCodeRunnerFile.py
 # Ruff stuff:
 .ruff_cache/
 
-# Claude Code (local session config — not part of the deliverable)
-.claude/
+# Claude Code: ship project-level skills (and the optional shared
+# settings.json), keep per-developer state out (settings.local.json,
+# transcripts, etc).
+.claude/*
+!.claude/skills/
+!.claude/skills/**
+!.claude/settings.json
 
 # PyPI configuration file
 .pypirc

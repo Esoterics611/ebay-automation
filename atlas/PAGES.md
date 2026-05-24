@@ -106,9 +106,15 @@ against.
 **Dynamic behaviors:**
 - May render as a full page (direct `/cart` nav) or a drawer overlay
   (triggered from item page) — components abstract both.
-- Guest access is supported; do not let any flow click "Check out", which
-  forces a login interstitial.
+- Guest access is supported in most regions; do not let any flow click
+  "Check out", which forces a login interstitial.
 - Subtotal updates reactively when items are removed; read it once cart
   state is stable (use `expect(subtotal_locator).to_have_text(...)`).
-- Currency badge can shift if an item is priced in a different currency
-  than the session; we keep all scenarios USD-only for now.
+- Currency follows the visitor's region (ILS for IL; USD for US, etc.);
+  the price parser anchors on both `$` and `ILS`. Scenario thresholds
+  in `db/data.yaml` are in ILS by default — see README §Currency.
+- **Region-disabled `/cart`:** during shipping pauses (observed for IL
+  in 2024+), navigating to `/cart` redirects guests to `/n/error`
+  (HTTP 404), even though `Add to cart` still updates the header
+  mini-cart dropdown. `CartPage.is_unavailable()` detects this; see
+  EDGE_CASES.md for the strategy.

@@ -8,6 +8,17 @@ from ebay_automation.services.base import BaseService
 from ebay_automation.services.variants import VariantService
 
 
+class CartUnavailableError(RuntimeError):
+    """Raised when the ``/cart`` page does not load (HTTP 404 / redirect
+    to ``/n/error``) — observed for guests in IL during the eBay
+    shipping-pause. Note: the cart *data* still exists (the header
+    mini-cart dropdown shows added items); only the full-page cart at
+    ``/cart`` is blocked. The subtotal assertion reads from
+    ``/cart``, so it cannot run in this state. Tests convert this to
+    ``pytest.skip``; the add-to-cart flow is exercised in full. See
+    README §Assumptions."""
+
+
 class CartService(BaseService):
     """Per-URL add-to-cart driver and cart-subtotal assertion."""
 
@@ -49,9 +60,18 @@ class CartService(BaseService):
         items_count: int,
     ) -> None:
         """Open the cart, capture state, parse the subtotal as Decimal,
-        and assert it is ``<= budget_per_item * items_count``. Raises an
-        ``AssertionError`` with a structured message on failure."""
+        and assert it is ``<= budget_per_item * items_count``. Raises
+        ``CartUnavailableError`` when eBay redirects to an error page
+        (guest cart disabled in this region), or ``AssertionError``
+        with a structured message when the subtotal exceeds budget."""
         self._cart.open()
+        if self._cart.is_unavailable():
+            raise CartUnavailableError(
+                f"/cart page returned 404 (landed on {self.page.url!r}); "
+                f"items remain in the header mini-cart dropdown — only "
+                f"the full-page cart is blocked, observed for IL guests "
+                f"during the shipping pause. See README §Assumptions."
+            )
         screenshot_path = self._cart.screenshot_cart()
         subtotal = self._cart.subtotal()
         # Second screenshot at the moment the subtotal was parsed. Lets a
