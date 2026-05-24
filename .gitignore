@@ -206,6 +206,9 @@ tempCodeRunnerFile.py
 # Ruff stuff:
 .ruff_cache/
 
+# Claude Code (local session config — not part of the deliverable)
+.claude/
+
 # PyPI configuration file
 .pypirc
 

@@ -34,6 +34,7 @@ Always reach for the highest-priority locator that works:
 | SearchResultsComponent | Card title | `card.get_by_role("link").first` |
 | SearchResultsComponent | Sponsored badge | `card.get_by_text("SPONSORED", exact=False)` |
 | SearchResultsComponent | Next page | `page.get_by_role("link", name="Next page")` |
+| SearchResultsComponent | Card links (XPath, per brief) | `page.locator("xpath=//ul[contains(@class,'srp-results')]/li[contains(@class,'s-item')]//a[contains(@class,'s-item__link')]")` |
 | ItemComponent | Title | `page.get_by_role("heading", level=1)` |
 | ItemComponent | Price | `page.locator('[data-testid="x-price-primary"]')` (CSS fallback) |
 | ItemComponent | Variant picker | `page.get_by_role("combobox", name=re.compile(r"select", re.I))` |

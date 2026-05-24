@@ -20,9 +20,7 @@ def test_full_e2e_search_add_assert(
         auth_service.start_guest_session()
 
     with allure.step("SEARCH"):
-        urls = search_service.search_items_by_name_under_price(
-            "shoes", Decimal("220"), 5
-        )
+        urls = search_service.search_items_by_name_under_price("shoes", Decimal("640"), 5)
         path = screenshots.capture("search-results")
         allure.attach.file(
             str(path),
@@ -35,7 +33,7 @@ def test_full_e2e_search_add_assert(
         cart_service.add_items_to_cart(urls)
 
     with allure.step("ASSERT_TOTAL"):
-        cart_service.assert_cart_total_not_exceeds(Decimal("220"), len(urls))
+        cart_service.assert_cart_total_not_exceeds(Decimal("640"), len(urls))
         path = screenshots.capture("cart")
         allure.attach.file(
             str(path),

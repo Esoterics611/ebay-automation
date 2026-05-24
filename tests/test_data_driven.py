@@ -47,8 +47,7 @@ def test_scenario(
         )
 
     assert len(urls) >= scenario.min_results, (
-        f"scenario {scenario.id}: min_results={scenario.min_results}, "
-        f"got len(urls)={len(urls)}"
+        f"scenario {scenario.id}: min_results={scenario.min_results}, " f"got len(urls)={len(urls)}"
     )
 
     if not urls:

@@ -13,9 +13,7 @@ class CartPage(BaseComponent):
 
     URL_PATH = "/cart"
     _SEL_SUBTOTAL_TEXT = re.compile(r"^Subtotal", re.I)
-    _SEL_LINE_ITEM_CSS = (
-        "[data-testid='cart-item'], li.cart-item, [data-listitemid]"
-    )
+    _SEL_LINE_ITEM_CSS = "[data-testid='cart-item'], li.cart-item, [data-listitemid]"
 
     def __init__(self, page: Page) -> None:
         super().__init__(page)

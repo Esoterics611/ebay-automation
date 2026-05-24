@@ -48,6 +48,36 @@ if [ -f .env.example ]; then
     cp -n .env.example .env || true
 fi
 
+# --- Allure CLI (Java-based; not on PyPI — uv sync cannot install it) ---
+# The pip package `allure-pytest` (in uv.lock) only emits JSON results;
+# rendering them as HTML needs the standalone Allure 2 binary, which is
+# a JVM tool distributed via GitHub releases. Install it into ~/.local
+# on first run; require a JRE on PATH. If java is missing, skip and
+# print a clear instruction — pytest itself is unaffected.
+ALLURE_VERSION="2.30.0"
+ALLURE_HOME="$HOME/.local/allure-${ALLURE_VERSION}"
+ALLURE_BIN="$HOME/.local/bin/allure"
+mkdir -p "$HOME/.local/bin"
+if command -v allure >/dev/null 2>&1; then
+    echo "allure: $(allure --version 2>&1 | head -1) OK"
+elif ! command -v java >/dev/null 2>&1; then
+    echo "allure: skipping (java JRE not found on PATH)."
+    echo "  pytest will still emit results to allure-results/."
+    echo "  To view locally: install a JRE (e.g. 'sudo apt install default-jre')"
+    echo "  then re-run this script, or use the GitHub Actions artifact."
+elif [ ! -x "$ALLURE_HOME/bin/allure" ]; then
+    echo "installing allure CLI ${ALLURE_VERSION}..."
+    curl -fsSL "https://github.com/allure-framework/allure2/releases/download/${ALLURE_VERSION}/allure-${ALLURE_VERSION}.tgz" \
+        -o /tmp/allure.tgz
+    tar -xzf /tmp/allure.tgz -C "$HOME/.local"
+    rm /tmp/allure.tgz
+    ln -sf "$ALLURE_HOME/bin/allure" "$ALLURE_BIN"
+    echo "allure: installed to $ALLURE_HOME (symlinked at $ALLURE_BIN)"
+else
+    ln -sf "$ALLURE_HOME/bin/allure" "$ALLURE_BIN"
+    echo "allure: $ALLURE_HOME present"
+fi
+
 # --- unit-test sanity ---
 uv run pytest tests/unit -v
 
@@ -56,5 +86,7 @@ cat <<'EOF'
 Environment ready.
 Run regression:   PROFILE=ci uv run pytest -m regression -n 4 --alluredir=allure-results
 Run simulation:   uv run python scripts/simulate_usage.py
-View Allure:      uv run allure serve allure-results
+View Allure:      allure serve allure-results
+                  (if allure was skipped above, install a JRE and re-run init_env.sh,
+                   or download the rendered report from GitHub Actions artifacts)
 EOF

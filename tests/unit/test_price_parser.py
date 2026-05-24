@@ -28,6 +28,13 @@ from ebay_automation.utils.price_parser import parse_price
         ("Subtotal (12 items) US $1,234.50", Decimal("1234.50")),
         # Whitespace tolerance around the $ sign
         ("$ 42.50", Decimal("42.50")),
+        # ILS-anchored amounts — eBay localizes SRP price text to the
+        # visitor's IP. ILS is the assessment locale (see README §Currency).
+        ("ILS 356.56", Decimal("356.56")),
+        ("ILS 25", Decimal("25")),
+        ("ILS 1,486.79", Decimal("1486.79")),
+        ("ILS 25 to ILS 30", Decimal("25")),
+        ("+ILS 75.00 delivery", Decimal("75.00")),
     ],
 )
 def test_parse_price_valid(text: str, expected: Decimal) -> None:

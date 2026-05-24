@@ -40,8 +40,7 @@ def collect_until(
     if max_pages is None:
         if env is None:
             raise ValueError(
-                "collect_until requires either max_pages or env "
-                "(to read max_pages_to_paginate)"
+                "collect_until requires either max_pages or env " "(to read max_pages_to_paginate)"
             )
         max_pages = env.max_pages_to_paginate
 

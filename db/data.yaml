@@ -1,0 +1,120 @@
+# Single source of truth for environments, scenarios, and demo scenarios.
+# Loaded by ebay_automation.db.client.TestDatabase; validated against the
+# dataclasses in ebay_automation.db.models.
+#
+# Money values (`max_price`) are quoted strings so they parse via
+# Decimal(str(...)) without ever passing through Python float. Never put
+# secrets in this file — secrets belong in .env (gitignored).
+#
+# Currency: ILS. eBay localizes SRP prices to the visitor's IP — the
+# assessment runs from Israel, so prices arrive as "ILS NNN.NN" rather
+# than "$NN.NN". Scenario thresholds below are in ILS at the live rate
+# (~2.89 ILS / USD as of 2026-05-24), rounded up for readable boundaries.
+# See README §Currency.
+
+environments:
+  dev:
+    base_url: https://www.ebay.com
+    region: IL
+    currency: ILS
+    headless: false
+    slow_mo_ms: 100
+    trace: retain-on-failure
+    video: retain-on-failure
+    screenshot_on_failure: true
+    max_pages_to_paginate: 5
+  ci:
+    base_url: https://www.ebay.com
+    region: IL
+    currency: ILS
+    headless: true
+    slow_mo_ms: 0
+    trace: retain-on-failure
+    video: retain-on-failure
+    screenshot_on_failure: true
+    max_pages_to_paginate: 3
+
+scenarios:
+  smoke-usb-cables:
+    name: "USB cables under ILS 30"
+    query: usb cable
+    max_price: "30.00"
+    limit: 3
+    min_results: 1
+    allow_partial: true
+    tags: [smoke]
+  smoke-paperbacks:
+    name: "Paperback novels under ILS 45"
+    query: paperback novel
+    max_price: "45.00"
+    limit: 5
+    min_results: 2
+    allow_partial: true
+    tags: [smoke]
+  regression-bluetooth-speakers:
+    name: "Bluetooth speakers under ILS 150"
+    query: bluetooth speaker
+    max_price: "150.00"
+    limit: 10
+    min_results: 10
+    allow_partial: false
+    tags: [regression]
+  regression-vintage-postcards:
+    name: "Vintage postcards under ILS 60"
+    query: vintage postcard
+    max_price: "60.00"
+    limit: 15
+    min_results: 5
+    allow_partial: true
+    tags: [regression]
+  regression-leather-wallets:
+    name: "Leather wallets under ILS 90"
+    query: leather wallet
+    max_price: "90.00"
+    limit: 8
+    min_results: 8
+    allow_partial: false
+    tags: [regression]
+
+demos:
+  demo-vintage-cameras:
+    name: "Vintage cameras under ILS 150"
+    query: vintage camera
+    max_price: "150.00"
+    limit: 5
+    narrative: >-
+      Collectibles category with mixed auction and Buy-It-Now listings.
+      Exercises sponsored-result skipping and auction filtering.
+  demo-wireless-headphones:
+    name: "Wireless headphones under ILS 225"
+    query: wireless headphones
+    max_price: "225.00"
+    limit: 10
+    narrative: >-
+      High-volume category with variant selection (color, connectivity) and
+      pagination — exercises the variants service end to end.
+  demo-retro-gaming:
+    name: "Retro game consoles under ILS 300"
+    query: retro game console
+    max_price: "300.00"
+    limit: 8
+    narrative: >-
+      Active auction category — validates that the flow only picks up
+      fixed-price items and skips live auctions cleanly.
+  demo-mechanical-keyboards:
+    name: "Mechanical keyboards under ILS 450"
+    query: mechanical keyboard
+    max_price: "450.00"
+    limit: 6
+    narrative: >-
+      Price-range listings ("ILS X to ILS Y" format) and variant pickers
+      (switch type, layout) — exercises the currency-parser range fallback.
+  demo-coffee-grinders:
+    name: "Coffee grinders under ILS 120"
+    query: coffee grinder
+    max_price: "120.00"
+    limit: 10
+    narrative: >-
+      Listings priced across ILS and (occasionally) USD/CAD sellers; cart
+      drawer vs page split — validates that the cart service normalises
+      both.

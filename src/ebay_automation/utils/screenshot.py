@@ -27,9 +27,7 @@ class ScreenshotManager:
         self._step_counter += 1
         ts = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
         filename = (
-            f"{_safe(self.test_id)}__"
-            f"{self._step_counter:02d}_{_safe(step)}__"
-            f"{ts}.png"
+            f"{_safe(self.test_id)}__" f"{self._step_counter:02d}_{_safe(step)}__" f"{ts}.png"
         )
         path = self.base_dir / filename
         self.page.screenshot(path=str(path), full_page=full_page)

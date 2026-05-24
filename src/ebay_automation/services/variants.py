@@ -10,12 +10,8 @@ from ebay_automation.services.base import BaseService
 class VariantService(BaseService):
     """Resolves required variant pickers on the item detail page."""
 
-    _PLACEHOLDER_PATTERN = re.compile(
-        r"^\s*(?:-+|select|choose|please select|--)", re.I
-    )
-    _OUT_OF_STOCK_PATTERN = re.compile(
-        r"(?:out of stock|sold out|unavailable)", re.I
-    )
+    _PLACEHOLDER_PATTERN = re.compile(r"^\s*(?:-+|select|choose|please select|--)", re.I)
+    _OUT_OF_STOCK_PATTERN = re.compile(r"(?:out of stock|sold out|unavailable)", re.I)
 
     def __init__(self, page: Page) -> None:
         super().__init__(page)
@@ -41,9 +37,7 @@ class VariantService(BaseService):
                 and not self._OUT_OF_STOCK_PATTERN.search(label)
             ]
             if not valid:
-                self.log.warning(
-                    "variant: no in-stock option for combobox; skipping"
-                )
+                self.log.warning("variant: no in-stock option for combobox; skipping")
                 continue
             choice = random.choice(valid)
             combo.select_option(label=choice)

@@ -12,8 +12,23 @@ class SearchResultsPage(BaseComponent):
     """Search results page. URL pattern documented in atlas/PAGES.md."""
 
     URL_PATH = "/sch/i.html"
-    _SEL_CARDS_CSS = "ul.srp-results > li.s-item"
+    # eBay's 2024 SRP rewrite renamed the result-card container and item
+    # classes from .s-item to .s-card; the wrapping <ul> is now
+    # .srp-river-results (no id).
+    _SEL_CARDS_CSS = ".srp-river-results li.s-card"
     _SEL_NEXT_PAGE_NAME = "Next page"
+    # The assignment brief asks to retrieve items "using XPath". Role/CSS
+    # locators are this suite's default (atlas/SELECTORS.md) because they
+    # survive cosmetic refactors; XPath is reserved for exactly this
+    # spec-mandated case. `//` is the descendant axis; each predicate
+    # `[contains(@class, '...')]` filters by class without binding to
+    # element position (no `li[2]`-style ordinal traversal, which eBay
+    # shuffles per visitor).
+    _SEL_CARD_LINKS_XPATH = (
+        "//*[contains(@class, 'srp-river-results')]"
+        "//li[contains(@class, 's-card')]"
+        "//a[contains(@class, 's-card__link')]"
+    )
 
     def __init__(self, page: Page) -> None:
         super().__init__(page)
@@ -32,6 +47,18 @@ class SearchResultsPage(BaseComponent):
         # List comprehension is a structural child-factory, not business
         # logic — each card is wrapped as its own typed sub-component.
         return [ResultCardComponent(self.page, cards.nth(i)) for i in range(cards.count())]
+
+    def card_links_via_xpath(self) -> list[str]:
+        """Return result-card item URLs collected via an explicit XPath
+        expression, satisfying the brief's "retrieve using XPath" clause.
+
+        Functionally equivalent to ``get_visible_result_cards`` (which the
+        default flow uses), but expressed as XPath to demonstrate the
+        positional-traversal locator family. The walrus `:=` keeps only
+        cards that actually expose an ``href``.
+        """
+        links = self.page.locator(f"xpath={self._SEL_CARD_LINKS_XPATH}")
+        return [href for i in range(links.count()) if (href := links.nth(i).get_attribute("href"))]
 
     def apply_price_filter(self, max_price: Decimal) -> None:
         self.filter_panel.apply_price_range(max_value=max_price)

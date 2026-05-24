@@ -28,11 +28,8 @@ ebay-automation/
 │   ├── FLOWS.md                 # E2E flow specification
 │   ├── SELECTORS.md             # selector strategy & priority
 │   └── EDGE_CASES.md            # cookie banners, geo, variants, currency …
-├── db/                          # JSON store (config + scenario data)
-│   ├── environments.json        # per-profile browser/runtime config
-│   ├── scenarios.json           # parameterised scenarios for the suites
-│   ├── expectations.json        # pass criteria per scenario id
-│   └── demo_scenarios.json      # curated showcase scenarios
+├── db/                          # YAML store (config + scenario data)
+│   └── data.yaml                # environments, scenarios, demos under top-level keys
 ├── src/
 │   └── ebay_automation/
 │       ├── db/                  # TestDatabase + dataclass models
@@ -70,8 +67,8 @@ tests  →  services  →  components  →  playwright
 | No selectors in test files | Couples tests to markup; breaks en masse on redesign |
 | No `time.sleep()` anywhere | Race conditions; use `expect(locator).to_…()` or `page.wait_for_*` |
 | `Decimal` for all money values | Float rounding errors corrupt price comparisons |
-| No hardcoded URLs in tests | All base URLs come from `db/environments.json` via `PROFILE` |
-| Secrets in `.env` only | Structural config in `db/*.json`; credentials never in JSON |
+| No hardcoded URLs in tests | All base URLs come from `db/data.yaml` (`environments` table) via `PROFILE` |
+| Secrets in `.env` only | Structural config in `db/data.yaml`; credentials never in the YAML |
 
 ### Component conventions
 
@@ -143,4 +140,4 @@ Switch environments by setting `PROFILE` in `.env` or inline:
 PROFILE=ci uv run pytest -m smoke
 ```
 
-Profiles are defined in `db/environments.json` (currently `dev` and `ci`).
+Profiles are defined in `db/data.yaml` under `environments:` (currently `dev` and `ci`).

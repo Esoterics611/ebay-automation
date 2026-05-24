@@ -53,7 +53,7 @@ class SearchService(BaseService):
 
         urls = collect_until(
             component=self._results,
-            collect_fn=lambda r: self._collect_card_urls(r, max_price),
+            collect_fn=lambda _: self._collect_card_urls(self._results, max_price),
             target_count=limit,
             env=self.env,
         )

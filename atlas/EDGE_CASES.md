@@ -84,15 +84,18 @@ Cart. If no variants can be satisfied, log and skip the item.
 ## Currency parsing
 
 **Symptoms:** Displayed prices include currency symbols, codes, thousands
-separators, and occasionally explicit "US " prefixes:
-- `$19.99`
-- `US $1,234.56`
-- `$10.00 to $25.00`
+separators, and explicit "US " prefixes. eBay localizes the SRP price
+text to the visitor's IP — the assessment runs from Israel, so prices
+arrive as `ILS NNN.NN` rather than `$NN.NN`. Both forms must parse:
+- `$19.99`, `US $1,234.56`, `$10.00 to $25.00`
+- `ILS 25`, `ILS 356.56`, `ILS 1,486.79`, `ILS 25 to ILS 30`
+- `+ILS 75.00 delivery` (shipping line in card body)
 
-**Strategy:** Strip everything that is not a digit, dot, or hyphen, then
-construct `Decimal` from the resulting string. Use `Decimal(str(value))`
-form to avoid float intermediate values. Never multiply or compare price
-strings via `float()`.
+**Strategy:** Anchor on a currency token (`$` or `ILS`), then capture the
+numeric. `Decimal(str(...))` only — never `float`. The price parser
+returns the lower bound for ranges, which is what the filtering rules
+use. Bare numerics (`Subtotal (3 items)`) are rejected on purpose: the
+anchor disambiguates the count from the price.
 
 ---
 

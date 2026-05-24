@@ -25,7 +25,11 @@ class HeaderComponent(BaseComponent):
 
     def search(self, query: str) -> None:
         self.search_input.fill(query)
-        self.root.get_by_role("button", name=self._SEL_SEARCH_SUBMIT_NAME).click()
+        # exact=True so "Search" does not also match the "Clear search"
+        # button that appears once the input has text.
+        self.root.get_by_role(
+            "button", name=self._SEL_SEARCH_SUBMIT_NAME, exact=True
+        ).click()
 
     def open_cart(self) -> None:
         self.root.get_by_role("link", name=self._SEL_CART_NAME).first.click()

@@ -1,6 +1,14 @@
 # eBay Automation Suite
 
-[![regression](https://github.com/<USERNAME_PLACEHOLDER>/<REPO_PLACEHOLDER>/actions/workflows/regression.yml/badge.svg)](https://github.com/<USERNAME_PLACEHOLDER>/<REPO_PLACEHOLDER>/actions/workflows/regression.yml)
+[![regression](https://github.com/vanguard-dao/ebay-automation/actions/workflows/regression.yml/badge.svg)](https://github.com/vanguard-dao/ebay-automation/actions/workflows/regression.yml)
+
+> **Currency note for reviewers.** eBay localizes search-results prices to
+> the visitor's IP. Because this assessment is delivered from Israel,
+> scenario thresholds and the e2e test budget are denominated in **ILS**
+> (at ~2.89 ILS / USD). The price parser accepts both `$` and `ILS`
+> anchors, so a US-based reviewer running from a US IP can rescale
+> `db/data.yaml` thresholds back to USD without code changes — see
+> §"Assumptions and Limitations".
 
 End-to-end automation suite for ebay.com built with Python 3.11, Playwright,
 pytest, and Allure. Implements the four spec functions — guest auth,
@@ -26,7 +34,7 @@ step — safe for re-runs and cron.
 
 ```
 +-------------------------------------------------------+
-|  tests/  (pytest, parametrized from db/scenarios.json)|
+|  tests/  (pytest, parametrized from db/data.yaml)     |
 +-------------------------------------------------------+
                         |
                         v
@@ -63,21 +71,28 @@ across the smoke, regression, and data-driven suites. A services layer keeps
 each tier with one job: components know markup, services know flow, tests
 know assertions.
 
-### Why JSON DB instead of .env
+### Why YAML DB instead of .env
 
 Test scenarios, environment profiles, and demo narratives are structured,
 queryable, and shared across the regression suite, the data-driven runner,
-and `scripts/simulate_usage.py`. JSON is the right shape — typed loaders
-(`db/models.py`) and accessor classes (`db.scenarios.where(tag=...)`) make
-the data first-class. `.env` is reserved for secrets, which on a public,
-guest-only site like eBay is mostly empty here.
+and `scripts/simulate_usage.py`. A single [`db/data.yaml`](db/data.yaml)
+holds all three tables under top-level keys (`environments`, `scenarios`,
+`demos`) — typed loaders (`db/models.py`) and accessor classes
+(`db.scenarios.where(tag=...)`) make the data first-class. `.env` is
+reserved for secrets, which on a public, guest-only site like eBay is
+mostly empty here. Money values (`max_price`) are quoted strings so they
+parse via `Decimal(str(...))` without ever touching `float`.
 
 ### Locator strategy
 
 Role-based locators are first choice (`get_by_role`, `get_by_label`,
 `get_by_text`). CSS is fallback when the site exposes no semantic role
-(e.g. eBay's price node carries only a `data-testid`). XPath is avoided
-unless positional traversal is unavoidable. Cookie-banner dismissal and
+(e.g. eBay's price node carries only a `data-testid`). XPath is reserved
+for the single case the brief explicitly requires it: the assignment asks
+to "retrieve the items using XPath," so `SearchResultsPage.card_links_via_xpath()`
+implements that retrieval path with an explicit, commented XPath expression,
+while the default search flow stays role/CSS-based for resilience.
+Cookie-banner dismissal and
 region/currency cookie pinning happen once in `tests/conftest.py` fixtures,
 not per-test. See [`atlas/SELECTORS.md`](atlas/SELECTORS.md) for the full
 priority order and per-component locator table.
@@ -87,7 +102,7 @@ priority order and per-component locator table.
 To add a new flow: document it in [`atlas/FLOWS.md`](atlas/FLOWS.md), add a
 method on an existing service (or a new service if the flow spans a new
 domain), then either add a test under `tests/` or a scenario row in
-[`db/scenarios.json`](db/scenarios.json) — the data-driven runner picks it
+[`db/data.yaml`](db/data.yaml) under the `scenarios:` table — the data-driven runner picks it
 up automatically. Components rarely need to change because they cover the
 markup surface eBay actually exposes (4 pages, ~5 sub-components).
 
@@ -104,10 +119,8 @@ ebay-automation/
 │   ├── FLOWS.md                       #   E2E flow specification
 │   ├── SELECTORS.md                   #   selector priority + per-component table
 │   └── EDGE_CASES.md                  #   cookie banners, geo, variants, currency
-├── db/                                # JSON store (config + scenario data)
-│   ├── environments.json              #   per-profile browser/runtime config
-│   ├── scenarios.json                 #   parameterised regression scenarios
-│   └── demo_scenarios.json            #   curated showcase scenarios
+├── db/                                # YAML store (config + scenario data)
+│   └── data.yaml                      #   environments, scenarios, demos under top-level keys
 ├── src/ebay_automation/
 │   ├── db/                            # TestDatabase + dataclass models
 │   ├── utils/                         # logger, ScreenshotManager, price_parser, paginator
@@ -117,7 +130,7 @@ ebay-automation/
 │   ├── conftest.py                    # fixtures: db, services, region cookies, Allure env
 │   ├── test_smoke.py                  # @smoke   — fast critical-path
 │   ├── test_search_under_price.py     # @regression — full E2E
-│   ├── test_data_driven.py            # @regression — parametrized from db/scenarios.json
+│   ├── test_data_driven.py            # @regression — parametrized from db/data.yaml (scenarios)
 │   └── unit/test_price_parser.py      # pure-Python parser tests (22 cases)
 ├── scripts/
 │   ├── init_env.sh                    # idempotent local bootstrap
@@ -129,13 +142,13 @@ ebay-automation/
 
 ## 4. Configuration
 
-**JSON DB.** Structural test data lives in [`db/`](db/) and is loaded via
-`TestDatabase`. `environments.json` maps a profile id (`dev`, `ci`) to
-browser/runtime knobs (headless, slow-mo, trace policy, region, currency,
-pagination cap). `scenarios.json` defines parameterised regression rows
-(query, max_price, limit, min_results, allow_partial, tags).
-`demo_scenarios.json` carries the same shape plus a `narrative` field for
-the demo runner.
+**YAML DB.** Structural test data lives in [`db/data.yaml`](db/data.yaml)
+and is loaded via `TestDatabase`. Three top-level keys: `environments`
+maps a profile id (`dev`, `ci`) to browser/runtime knobs (headless,
+slow-mo, trace policy, region, currency, pagination cap); `scenarios`
+defines parameterised regression rows (query, max_price, limit,
+min_results, allow_partial, tags); `demos` carries the same shape plus a
+`narrative` field for the demo runner.
 
 **Environment selection.** Profile is chosen via the `PROFILE` env var
 (default `dev`). `dev` is headed with slow-mo for watchability; `ci` is
@@ -183,11 +196,10 @@ failure screenshots), as artifacts on every workflow run — including
 failed ones (`continue-on-error: true` on the test step). The latest run's
 artifacts are downloadable from the **Actions** tab in GitHub.
 
-![Allure report](docs/allure-screenshot.png)
-
-*Add `docs/allure-screenshot.png` after the first green CI run — generate
-it locally via `uvx allure serve allure-results` and screenshot the
-dashboard.*
+The Allure dashboard — suites, timeline, the Environment panel populated by
+`conftest.py`, and per-step screenshots — is downloadable from the
+**Actions** tab after any CI run, or viewable locally via
+`uv run allure serve allure-results`.
 
 ## 7. Demo Mode
 
@@ -195,7 +207,7 @@ dashboard.*
 uv run python scripts/simulate_usage.py
 ```
 
-Drives every demo scenario in [`db/demo_scenarios.json`](db/demo_scenarios.json)
+Drives every demo scenario from [`db/data.yaml`](db/data.yaml) (`demos:` table)
 through the same `search → add-to-cart → assert-subtotal` flow as the
 regression suite, but headed (`PROFILE=dev`) and outside pytest. Its
 purpose is to prove the framework is library-quality: a sales demo or
@@ -219,13 +231,17 @@ artifact bundles (`allure-results`, `allure-report`, `reports`,
   credentials-storage burden out of proportion with this flow's needs.
   The assignment explicitly allows a guest/stub approach. `AuthService`
   pre-loads region + currency cookies and lands on the home page.
-- **USD / US region only.** Locale and currency are pinned via cookie at
-  the browser-context level. Cross-currency scenarios are out of scope.
+- **ILS / Israel region by default.** Locale and currency are pinned via
+  cookie at the browser-context level (`db/data.yaml` `environments:`).
+  eBay localizes price text to the visitor's IP, so the parser handles
+  both `$`- and `ILS`-anchored amounts. To run against USD, change the
+  profile's `region`/`currency` and rescale `scenarios:` `max_price`
+  values — no code changes required.
 - **eBay markup is volatile.** Selectors prefer accessibility roles; CSS
   is used only where eBay exposes no semantic anchor (price block,
   result card); no XPath is required for the implemented flow.
 - **Pagination bounded.** `max_pages_to_paginate` in
-  `db/environments.json` (default 5 / 3 for ci) caps the
+  `db/data.yaml` under `environments:` (default 5 / 3 for ci) caps the
   search-with-price loop so a query that doesn't yield `limit` items
   doesn't walk indefinitely.
 - **Variant selection is random.** When an item has variant pickers, the

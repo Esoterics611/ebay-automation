@@ -27,6 +27,7 @@ _ALLURE_RESULTS = _ROOT / "allure-results"
 
 # ---------- session-scoped config (browser-free) ----------
 
+
 @pytest.fixture(scope="session")
 def profile() -> str:
     return os.getenv("PROFILE", "dev")
@@ -49,6 +50,7 @@ def base_url(env: Environment) -> str:
 
 # ---------- playwright launch / context overrides ----------
 
+
 @pytest.fixture(scope="session")
 def browser_type_launch_args(
     browser_type_launch_args: dict[str, Any], env: Environment
@@ -61,9 +63,7 @@ def browser_type_launch_args(
 
 
 @pytest.fixture(scope="session")
-def browser_context_args(
-    browser_context_args: dict[str, Any], env: Environment
-) -> dict[str, Any]:
+def browser_context_args(browser_context_args: dict[str, Any], env: Environment) -> dict[str, Any]:
     # Tracing, video and screenshot capture are driven by pytest-playwright
     # CLI flags (see pyproject [tool.pytest.ini_options] addopts) — do not
     # reimplement context-level tracing.start here.
@@ -76,6 +76,7 @@ def browser_context_args(
 
 
 # ---------- allure environment.properties (session-scoped, autouse) ----------
+
 
 @pytest.fixture(scope="session", autouse=True)
 def _allure_environment(env: Environment, profile: str) -> None:
@@ -104,6 +105,7 @@ def _allure_environment(env: Environment, profile: str) -> None:
 # Autouse fixtures are gated on ``request.fixturenames`` so that unit
 # tests under ``tests/unit/`` — which never request ``page`` or
 # ``context`` — do not pay the cost of launching a browser.
+
 
 def _uses_browser(request: pytest.FixtureRequest) -> bool:
     names = request.fixturenames
@@ -142,15 +144,14 @@ def screenshots(page: Page, request: pytest.FixtureRequest) -> ScreenshotManager
 
 # ---------- services (constructor injection from fixtures) ----------
 
+
 @pytest.fixture
 def variant_service(page: Page) -> VariantService:
     return VariantService(page)
 
 
 @pytest.fixture
-def auth_service(
-    page: Page, context: BrowserContext, env: Environment
-) -> AuthService:
+def auth_service(page: Page, context: BrowserContext, env: Environment) -> AuthService:
     return AuthService(page, context, env)
 
 
@@ -170,6 +171,7 @@ def cart_service(
 
 # ---------- data-driven scenarios ----------
 
+
 def pytest_generate_tests(metafunc: pytest.Metafunc) -> None:
     if "scenario" in metafunc.fixturenames:
         db = TestDatabase(_DB_PATH)
@@ -178,6 +180,7 @@ def pytest_generate_tests(metafunc: pytest.Metafunc) -> None:
 
 
 # ---------- hooks ----------
+
 
 @pytest.hookimpl(hookwrapper=True)
 def pytest_runtest_makereport(item, call):

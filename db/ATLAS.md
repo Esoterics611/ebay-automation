@@ -1,15 +1,15 @@
 # db/
 
-JSON store for structural configuration and static test data. Loaded by
-`ebay_automation.db.client.TestDatabase` and validated against the
-dataclasses in `ebay_automation.db.models`.
+Single-file YAML store for structural configuration and static test data.
+Loaded by `ebay_automation.db.client.TestDatabase` and validated against
+the dataclasses in `ebay_automation.db.models`.
 
-| File | Schema | Purpose |
+| File | Top-level keys | Purpose |
 |---|---|---|
-| `environments.json` | `Environment` | Per-profile (`dev`, `ci`) browser + runtime config |
-| `scenarios.json` | `Scenario` | Parameterised scenarios driving the regression / smoke suites; each carries its own `min_results` |
-| `demo_scenarios.json` | `DemoScenario` | Curated showcase scenarios with narrative copy |
+| `data.yaml` | `environments` | Per-profile (`dev`, `ci`) browser + runtime config — schema: `Environment` |
+| | `scenarios` | Parameterised scenarios driving the regression / smoke suites; each carries its own `min_results` and `tags` — schema: `Scenario` |
+| | `demos` | Curated showcase scenarios with narrative copy — schema: `DemoScenario` |
 
 **Never put secrets here.** Secrets belong in `.env` (gitignored). Money
-fields (`max_price`) are stored as **strings** and parsed to `Decimal`
-on load — never floats.
+fields (`max_price`) are stored as **quoted strings** and parsed via
+`Decimal(str(value))` on load — never floats.

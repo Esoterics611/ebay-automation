@@ -1,8 +1,9 @@
 """Headed demo of the eBay automation services outside pytest.
 
-Loads every demo scenario from db/demo_scenarios.json and runs the same
+Loads every demo scenario from db/data.yaml (demos table) and runs the same
 search → add-to-cart → subtotal-assert flow the regression suite uses,
 proving the components/services are reusable without pytest fixtures."""
+
 import subprocess
 from pathlib import Path
 
@@ -23,13 +24,21 @@ def main() -> None:
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=env.headless, slow_mo=env.slow_mo_ms)
         context = browser.new_context(
-            base_url=env.base_url, locale=f"en-{env.region}",
+            base_url=env.base_url,
+            locale=f"en-{env.region}",
             viewport={"width": 1440, "height": 900},
         )
-        context.add_cookies([
-            {"name": "ebay_region", "value": env.region, "domain": ".ebay.com", "path": "/"},
-            {"name": "ebay_currency", "value": env.currency, "domain": ".ebay.com", "path": "/"},
-        ])
+        context.add_cookies(
+            [
+                {"name": "ebay_region", "value": env.region, "domain": ".ebay.com", "path": "/"},
+                {
+                    "name": "ebay_currency",
+                    "value": env.currency,
+                    "domain": ".ebay.com",
+                    "path": "/",
+                },
+            ]
+        )
         page = context.new_page()
         variants = VariantService(page)
         search = SearchService(page, env)

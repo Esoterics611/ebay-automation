@@ -10,6 +10,7 @@ unimplemented; this script only verifies connectivity to the target
 environment. The pattern is here; the seed work happens when we own
 the SUT.
 """
+
 import argparse
 import urllib.error
 import urllib.request
@@ -29,7 +30,7 @@ def verify_connectivity(env) -> bool:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--env", default="dev", help="env id from db/environments.json")
+    parser.add_argument("--env", default="dev", help="env id from db/data.yaml (environments)")
     env = TestDatabase("db").environments.get(parser.parse_args().env)
     print(f"verifying {env.base_url}...")
     ok = verify_connectivity(env)

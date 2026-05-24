@@ -6,13 +6,13 @@ End-to-end flow this suite drives, expressed at the service level.
 
 ## Primary flow: search → filter → collect → add to cart → assert subtotal
 
-Inputs (from `db/scenarios.json` via `TestDatabase`):
+Inputs (from `db/data.yaml` under `scenarios:` via `TestDatabase`):
 - `query: str`
 - `max_price: Decimal`
 - `limit: int`           — target number of items to add to cart
 - `allow_partial: bool`  — if true, proceed with fewer items when supply
                            runs out before `limit`
-- `max_pages_to_paginate: int` (from `db/environments.json`)
+- `max_pages_to_paginate: int` (from `db/data.yaml` under `environments:`)
 
 ### Steps
 

@@ -33,17 +33,13 @@ class CartService(BaseService):
                 tab.goto(url)
                 item = ItemPage(tab)
                 if not item.is_buy_it_now():
-                    self.log.warning(
-                        "cart: skipping auction-only listing: %s", url
-                    )
+                    self.log.warning("cart: skipping auction-only listing: %s", url)
                     continue
                 if item.required_variant_selects():
                     self.variant_service.pick_random_variants(item)
                 item.add_to_cart()
                 screenshot_path = item.screenshot("added-to-cart")
-                self.log.info(
-                    "cart: added %s (screenshot=%s)", url, screenshot_path
-                )
+                self.log.info("cart: added %s (screenshot=%s)", url, screenshot_path)
             finally:
                 tab.close()
 
@@ -58,6 +54,12 @@ class CartService(BaseService):
         self._cart.open()
         screenshot_path = self._cart.screenshot_cart()
         subtotal = self._cart.subtotal()
+        # Second screenshot at the moment the subtotal was parsed. Lets a
+        # later failure investigation read the exact page state that
+        # produced the asserted Decimal — without it, a flake in
+        # subtotal parsing has only the post-assertion screenshot to
+        # work from, which can show a different drawer/modal state.
+        self._cart.screenshot("subtotal-read")
         budget = budget_per_item * items_count
         self.log.info(
             "cart: subtotal=%s budget=%s (%s × %d) screenshot=%s",
