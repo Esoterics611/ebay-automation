@@ -48,35 +48,76 @@ if [ -f .env.example ]; then
     cp -n .env.example .env || true
 fi
 
+# --- Java JRE (required by Allure CLI; not on PyPI) ---
+# Allure 2 is a JVM tool, so we need a JRE on PATH. If one is missing,
+# install a portable Adoptium Temurin JRE into ~/.local/jre — no sudo
+# required, works on any *nix box. This keeps the "any machine" promise
+# of init_env.sh intact.
+JRE_DIR="$HOME/.local/jre"
+mkdir -p "$HOME/.local/bin"
+if command -v java >/dev/null 2>&1; then
+    echo "java: $(java -version 2>&1 | head -1) OK"
+elif [ -x "$JRE_DIR/bin/java" ]; then
+    export PATH="$JRE_DIR/bin:$PATH"
+    echo "java: using portable JRE at $JRE_DIR"
+else
+    case "$(uname -s)" in
+        Linux)  jre_os=linux ;;
+        Darwin) jre_os=mac ;;
+        *)      jre_os="" ;;
+    esac
+    case "$(uname -m)" in
+        x86_64|amd64)  jre_arch=x64 ;;
+        aarch64|arm64) jre_arch=aarch64 ;;
+        *)             jre_arch="" ;;
+    esac
+    if [ -z "$jre_os" ] || [ -z "$jre_arch" ]; then
+        echo "java: unsupported OS/arch ($(uname -s)/$(uname -m)); install JRE manually."
+    else
+        echo "java: installing portable Adoptium JRE 21 (${jre_os}/${jre_arch})..."
+        url="https://api.adoptium.net/v3/binary/latest/21/ga/${jre_os}/${jre_arch}/jre/hotspot/normal/eclipse"
+        curl -fsSL "$url" -o /tmp/jre.tar.gz
+        mkdir -p "$JRE_DIR"
+        # Tarball has a single top-level dir; --strip-components=1 places
+        # bin/, lib/, etc. directly under $JRE_DIR.
+        tar -xzf /tmp/jre.tar.gz -C "$JRE_DIR" --strip-components=1
+        rm /tmp/jre.tar.gz
+        export PATH="$JRE_DIR/bin:$PATH"
+        echo "java: portable JRE installed to $JRE_DIR"
+    fi
+fi
+
 # --- Allure CLI (Java-based; not on PyPI — uv sync cannot install it) ---
 # The pip package `allure-pytest` (in uv.lock) only emits JSON results;
-# rendering them as HTML needs the standalone Allure 2 binary, which is
-# a JVM tool distributed via GitHub releases. Install it into ~/.local
-# on first run; require a JRE on PATH. If java is missing, skip and
-# print a clear instruction — pytest itself is unaffected.
+# rendering them as HTML needs the standalone Allure 2 binary. We write
+# a launcher wrapper at ~/.local/bin/allure so the shell finds it on
+# PATH (~/.local/bin is already there because uv put itself there).
+# The wrapper pins JAVA_HOME to our portable JRE if one was installed
+# above, so allure works even in shells where java is not otherwise
+# visible.
 ALLURE_VERSION="2.30.0"
 ALLURE_HOME="$HOME/.local/allure-${ALLURE_VERSION}"
 ALLURE_BIN="$HOME/.local/bin/allure"
-mkdir -p "$HOME/.local/bin"
-if command -v allure >/dev/null 2>&1; then
-    echo "allure: $(allure --version 2>&1 | head -1) OK"
-elif ! command -v java >/dev/null 2>&1; then
-    echo "allure: skipping (java JRE not found on PATH)."
-    echo "  pytest will still emit results to allure-results/."
-    echo "  To view locally: install a JRE (e.g. 'sudo apt install default-jre')"
-    echo "  then re-run this script, or use the GitHub Actions artifact."
-elif [ ! -x "$ALLURE_HOME/bin/allure" ]; then
+if [ ! -x "$ALLURE_HOME/bin/allure" ]; then
     echo "installing allure CLI ${ALLURE_VERSION}..."
     curl -fsSL "https://github.com/allure-framework/allure2/releases/download/${ALLURE_VERSION}/allure-${ALLURE_VERSION}.tgz" \
         -o /tmp/allure.tgz
     tar -xzf /tmp/allure.tgz -C "$HOME/.local"
     rm /tmp/allure.tgz
-    ln -sf "$ALLURE_HOME/bin/allure" "$ALLURE_BIN"
-    echo "allure: installed to $ALLURE_HOME (symlinked at $ALLURE_BIN)"
-else
-    ln -sf "$ALLURE_HOME/bin/allure" "$ALLURE_BIN"
-    echo "allure: $ALLURE_HOME present"
+    echo "allure: installed to $ALLURE_HOME"
 fi
+# Write/refresh the launcher wrapper. Use the portable JRE if it
+# exists, else trust the system java.
+cat > "$ALLURE_BIN" <<EOF
+#!/usr/bin/env bash
+if [ -x "$JRE_DIR/bin/java" ]; then
+    export JAVA_HOME="$JRE_DIR"
+    export PATH="\$JAVA_HOME/bin:\$PATH"
+fi
+exec "$ALLURE_HOME/bin/allure" "\$@"
+EOF
+chmod +x "$ALLURE_BIN"
+echo "allure: $($ALLURE_BIN --version 2>&1 | head -1) via $ALLURE_BIN"
 
 # --- unit-test sanity ---
 uv run pytest tests/unit -v
@@ -87,6 +128,6 @@ Environment ready.
 Run regression:   PROFILE=ci uv run pytest -m regression -n 4 --alluredir=allure-results
 Run simulation:   uv run python scripts/simulate_usage.py
 View Allure:      allure serve allure-results
-                  (if allure was skipped above, install a JRE and re-run init_env.sh,
-                   or download the rendered report from GitHub Actions artifacts)
+                  (allure + portable JRE installed under ~/.local/; the launcher at
+                   ~/.local/bin/allure resolves java automatically)
 EOF
