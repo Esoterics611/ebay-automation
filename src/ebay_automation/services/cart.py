@@ -68,10 +68,12 @@ class CartService(BaseService):
         self._cart.open()
         if self._cart.is_unavailable():
             raise CartUnavailableError(
-                f"/cart page returned 404 (landed on {self.page.url!r}); "
-                f"items remain in the header mini-cart dropdown — only "
-                f"the full-page cart is blocked, observed for IL guests "
-                f"during the shipping pause. See README §Assumptions."
+                f"/cart page did not render the cart (landed on "
+                f"{self.page.url!r}); causes include /n/error redirect "
+                f"(IL guests during the shipping pause) or an Akamai "
+                f"hCaptcha gate. Items remain in the header mini-cart "
+                f"dropdown — only the full-page cart is blocked. "
+                f"See README §Assumptions."
             )
         screenshot_path = self._cart.screenshot_cart()
         subtotal = self._cart.subtotal()

@@ -58,15 +58,20 @@ def test_scenario(
 
     with allure.step(f"ASSERT_TOTAL [{scenario.id}]"):
         try:
-            cart_service.assert_cart_total_not_exceeds(scenario.max_price, len(urls))
-        except CartUnavailableError as e:
-            # Safety net: cart routed to /n/error (regional block,
-            # deprecated URL, etc). Surface clearly via skip — do not
-            # silently pass. See README §Assumptions.
-            pytest.skip(str(e))
-        path = screenshots.capture("cart")
-        allure.attach.file(
-            str(path),
-            name="cart",
-            attachment_type=allure.attachment_type.PNG,
-        )
+            try:
+                cart_service.assert_cart_total_not_exceeds(scenario.max_price, len(urls))
+            except CartUnavailableError as e:
+                # Safety net: cart routed to /n/error (regional block,
+                # deprecated URL, etc). Surface clearly via skip — do not
+                # silently pass. See README §Assumptions.
+                pytest.skip(str(e))
+        finally:
+            # Brief requires unconditional cart-page screenshot/trace —
+            # attach even if subtotal exceeded budget or cart was
+            # unavailable, so the report always has the cart-page state.
+            path = screenshots.capture("cart")
+            allure.attach.file(
+                str(path),
+                name="cart",
+                attachment_type=allure.attachment_type.PNG,
+            )

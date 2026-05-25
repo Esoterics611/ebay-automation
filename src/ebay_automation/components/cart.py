@@ -23,6 +23,11 @@ class CartPage(BaseComponent):
     # the most reliable signal because the error page is otherwise
     # styled like a normal eBay page.
     _ERROR_URL_MARKER = "/n/error"
+    # eBay's Akamai layer occasionally gates /cart behind an hCaptcha
+    # ("Please verify yourself to continue"). The cart page never
+    # renders, so subtotal selectors time out generically — detect the
+    # gate explicitly so tests can skip with a clear reason instead.
+    _CAPTCHA_TEXT = re.compile(r"verify yourself", re.I)
 
     def __init__(self, page: Page) -> None:
         super().__init__(page)
@@ -36,12 +41,29 @@ class CartPage(BaseComponent):
     def is_unavailable(self) -> bool:
         """True when /cart did not actually load a cart — e.g. eBay
         redirected to an error page because guest cart is disabled in
-        this region. See README §Assumptions."""
-        return self._ERROR_URL_MARKER in self.page.url
+        this region, or the Akamai layer served an hCaptcha gate.
+        See README §Assumptions."""
+        if self._ERROR_URL_MARKER in self.page.url:
+            return True
+        return self.page.get_by_text(self._CAPTCHA_TEXT).count() > 0
 
     def subtotal(self) -> Decimal:
-        text = self.page.get_by_text(self._SEL_SUBTOTAL_TEXT).first.inner_text()
-        return parse_price(text)
+        # eBay's Order summary places "Subtotal" and the price in sibling
+        # elements; get_by_text("Subtotal") resolves to the label-only
+        # leaf whose inner_text drops the digits. Climb the nearest
+        # ancestors until we find one whose text contains a digit — the
+        # row that wraps both label and price.
+        label = self.page.get_by_text(self._SEL_SUBTOTAL_TEXT).first
+        current = label
+        for _ in range(4):
+            current = current.locator("xpath=..")
+            text = current.inner_text()
+            if re.search(r"\d", text):
+                return parse_price(text)
+        raise ValueError(
+            "subtotal price not found within 4 ancestors of the "
+            f"'Subtotal' label; label text: {label.inner_text()!r}"
+        )
 
     def items_count(self) -> int:
         return self.locator(self._SEL_LINE_ITEM_CSS).count()
