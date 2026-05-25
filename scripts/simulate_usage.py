@@ -67,7 +67,7 @@ def main() -> None:
         check=False,
     )
     print(f"\nDemo report: file://{_ROOT / 'allure-report' / 'index.html'}")
-    print("Or: allure serve allure-results  (allure CLI installed by scripts/init_env.sh)")
+    print("Or: allure serve --host 0.0.0.0 -p 8080 allure-results  → http://localhost:8080")
 
 
 if __name__ == "__main__":

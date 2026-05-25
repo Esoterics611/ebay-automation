@@ -60,8 +60,8 @@ def test_scenario(
         try:
             cart_service.assert_cart_total_not_exceeds(scenario.max_price, len(urls))
         except CartUnavailableError as e:
-            # Environmental block (e.g. eBay paused shipping to this
-            # region → guest cart disabled). Surface clearly; do not
+            # Safety net: cart routed to /n/error (regional block,
+            # deprecated URL, etc). Surface clearly via skip — do not
             # silently pass. See README §Assumptions.
             pytest.skip(str(e))
         path = screenshots.capture("cart")

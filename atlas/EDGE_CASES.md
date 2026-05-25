@@ -86,16 +86,19 @@ Cart. If no variants can be satisfied, log and skip the item.
 **Symptoms:** Displayed prices include currency symbols, codes, thousands
 separators, and explicit "US " prefixes. eBay localizes the SRP price
 text to the visitor's IP — the assessment runs from Israel, so prices
-arrive as `ILS NNN.NN` rather than `$NN.NN`. Both forms must parse:
+arrive as `ILS NNN.NN` on the SRP and `₪NNN.NN` on the cart page.
+Multiple forms must parse:
 - `$19.99`, `US $1,234.56`, `$10.00 to $25.00`
 - `ILS 25`, `ILS 356.56`, `ILS 1,486.79`, `ILS 25 to ILS 30`
-- `+ILS 75.00 delivery` (shipping line in card body)
+- `+ILS 75.00 delivery` (shipping line in SRP card body)
+- `₪332.48`, `₪ 1,486.79`, `Subtotal ₪332.48` (cart-page subtotal)
+- `NIS 50` (legacy widget format, occasionally)
 
-**Strategy:** Anchor on a currency token (`$` or `ILS`), then capture the
-numeric. `Decimal(str(...))` only — never `float`. The price parser
-returns the lower bound for ranges, which is what the filtering rules
-use. Bare numerics (`Subtotal (3 items)`) are rejected on purpose: the
-anchor disambiguates the count from the price.
+**Strategy:** Anchor on a currency token (`$`, `ILS`, `₪`, or `NIS`),
+then capture the numeric. `Decimal(str(...))` only — never `float`.
+The price parser returns the lower bound for ranges, which is what the
+filtering rules use. Bare numerics (`Subtotal (3 items)`) are rejected
+on purpose: the anchor disambiguates the count from the price.
 
 ---
 
@@ -112,31 +115,32 @@ present and keeps the flow deterministic.
 
 ---
 
-## `/cart` page disabled (cart data still works)
+## Cart subdomain (`cart.ebay.com`)
 
-**Symptoms:** Navigating `https://www.ebay.com/cart` returns HTTP 404
-with a redirect to `/n/error`. The error page is styled like a normal
-eBay page (header, search, footer) so a naive "did the page load?"
-check passes — the distinguishing signal is the URL substring
-`/n/error`. **However**, the cart *data* is intact: clicking "Add to
-cart" on an item page still updates the header mini-cart dropdown,
-which correctly lists items and shows a total. Only the standalone
-`/cart` URL is blocked.
+**Symptoms:** Navigating `https://www.ebay.com/cart` returns HTTP 302
+to `https://pages.ebay.com/cart` which then 404s on `/n/error` in some
+regions (this is the deprecated legacy route). The error page is
+styled like a normal eBay page (header, search, footer) so a naive
+"did the page load?" check passes — the distinguishing signal is the
+URL substring `/n/error`.
 
-**Cause:** Observed for guests in IL during the 2024+ eBay shipping
-pause to Israel (homepage banner: *"Shipping temporarily paused"*).
-The shape — full-page cart blocked while the dropdown works — is
-unusual and suggests a routing-level guard rather than a cart-storage
-disable.
+**Cause:** eBay moved the cart to its own subdomain
+`https://cart.ebay.com/`. The legacy `/cart` path on the main domain
+is a deprecated route that is regionally inconsistent.
 
-**Strategy:** `CartPage.is_unavailable()` checks for the URL marker
-after `/cart` navigation. `CartService.assert_cart_total_not_exceeds`
-raises a domain-specific `CartUnavailableError`; tests convert that
-to `pytest.skip` with the landing URL in the reason. The
-search/filter/add-to-cart flow remains green; only the subtotal
-assertion (which reads from `/cart`) is skipped. Reading the subtotal
-from the mini-cart dropdown is a possible follow-up but out of scope
-for this assessment.
+**Strategy:** `CartPage.URL_PATH` is the absolute URL
+`https://cart.ebay.com/`. As a safety net, `CartPage.is_unavailable()`
+checks for the `/n/error` URL substring after navigation. If eBay
+ever routes us there again (region block, deprecated path), the cart
+service raises a domain-specific `CartUnavailableError`; tests convert
+that to `pytest.skip` with the landing URL in the reason rather than
+fail opaquely. In normal use against `cart.ebay.com`, this never
+fires.
+
+**Subtotal text format:** The cart page displays the subtotal as
+`₪ 332.48` (Unicode shekel sign U+20AA) — not `ILS 332.48`. The
+price parser accepts both, plus `$`-prefixed amounts. See the
+"Currency parsing" section.
 
 ## Login interstitials (guest only)
 

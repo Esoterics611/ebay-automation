@@ -36,10 +36,9 @@ def test_full_e2e_search_add_assert(
         try:
             cart_service.assert_cart_total_not_exceeds(Decimal("640"), len(urls))
         except CartUnavailableError as e:
-            # Environmental block (e.g. eBay paused shipping to this
-            # region → guest cart disabled). Surface clearly; do not
-            # silently pass. See README §Assumptions and the
-            # flake-triage skill (bucket 1: ENVIRONMENT).
+            # Safety net: cart routed to /n/error (regional block,
+            # deprecated URL, etc). Surface clearly via skip — do not
+            # silently pass. See README §Assumptions.
             pytest.skip(str(e))
         path = screenshots.capture("cart")
         allure.attach.file(

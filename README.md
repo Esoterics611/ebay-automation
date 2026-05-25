@@ -2,31 +2,17 @@
 
 [![regression](https://github.com/vanguard-dao/ebay-automation/actions/workflows/regression.yml/badge.svg)](https://github.com/vanguard-dao/ebay-automation/actions/workflows/regression.yml)
 
-> **Notes for reviewers.**
-> 1. **Currency.** eBay localizes SRP prices to the visitor's IP.
->    Because this assessment is delivered from Israel, scenario
->    thresholds and the e2e budget are denominated in **ILS**
->    (~2.89 ILS / USD). The price parser accepts both `$` and `ILS`
->    anchors; a US-based reviewer can rescale `db/data.yaml`
->    thresholds back to USD without any code change.
-> 2. **`/cart` page returns 404 for IL guests (cart itself works).**
->    During the current eBay shipping pause for Israel (homepage banner:
->    *"Shipping temporarily paused"*), the full-page cart at `/cart`
->    redirects guests to `/n/error`. Items still go into the cart — the
->    header mini-cart dropdown lists them correctly — only the `/cart`
->    page is blocked. Because the subtotal assertion reads from
->    `/cart`, the cart service raises `CartUnavailableError` and the
->    tests `pytest.skip` with the visitor URL in the reason. The
->    search → filter → add-to-cart flow runs to completion; only the
->    final subtotal step is skipped. A US-based reviewer will see the
->    full assertion run.
->
-> See §"Assumptions and Limitations" for the complete list.
+End-to-end Playwright + pytest suite for ebay.com. Implements the four
+spec functions — guest auth, search-with-price-cap, add-to-cart,
+cart-total assertion — in a strict page-object + services architecture.
 
-End-to-end automation suite for ebay.com built with Python 3.11, Playwright,
-pytest, and Allure. Implements the four spec functions — guest auth,
-search-with-price-cap, add-to-cart, cart-total assertion — inside a strict
-page-object architecture with a services layer on top.
+> **Reviewer note.** Tests run from Israel and prices arrive in **ILS**
+> (~2.89 ILS / USD). `db/data.yaml` thresholds are ILS values; the
+> parser handles `$`, `ILS`, `₪`, and `NIS`. To rescale to USD, edit
+> the YAML — no code change.
+> See §"Assumptions and Limitations" for the full environment matrix.
+
+---
 
 ## 1. Quick Start
 
@@ -35,186 +21,142 @@ git clone <repo-url>
 cd ebay-automation
 ./scripts/init_env.sh
 PROFILE=ci uv run pytest -m regression -n 4 --alluredir=allure-results
-allure serve allure-results  # CLI installed by scripts/init_env.sh
+allure serve --host 0.0.0.0 -p 8080 allure-results
+# open http://localhost:8080
 ```
 
-`./scripts/init_env.sh` is idempotent. On a fresh box it installs uv, syncs
-Python deps, and provisions chromium + its system libs (one-time sudo). On
-subsequent runs it detects the libs are already present and skips the sudo
-step — safe for re-runs and cron.
+`init_env.sh` is idempotent. It installs `uv`, syncs Python deps,
+provisions Chromium, and pulls a portable Adoptium JRE + Allure CLI
+into `~/.local/`. No system Java needed. On WSL2, `--host 0.0.0.0`
+is required so the Windows browser can reach the Allure server.
 
 ## 2. Architecture
 
 ```
-+-------------------------------------------------------+
-|  tests/  (pytest, parametrized from db/data.yaml)     |
-+-------------------------------------------------------+
-                        |
-                        v
-+-------------------------------------------------------+
-|  services/  (the 4 spec functions, business logic)    |
-|    auth | search | cart | variants                    |
-+-------------------------------------------------------+
-                        |
-                        v
-+-------------------------------------------------------+
-|  components/  (POM: pages + sub-components)           |
-|    home, search_results, item, cart                   |
-|    header, cookie_banner, filter_panel, result_card   |
-+-------------------------------------------------------+
-                        |
-                        v
-+-------------------------------------------------------+
-|  Playwright sync API                                  |
-+-------------------------------------------------------+
+┌───────────────────────────────────────────────────────┐
+│  tests/     pytest, parametrized from db/data.yaml    │
+├───────────────────────────────────────────────────────┤
+│  services/  4 spec functions; business logic          │
+│             auth | search | cart | variants           │
+├───────────────────────────────────────────────────────┤
+│  components/  POM: pages + sub-components             │
+│               home, search_results, item, cart        │
+│               header, cookie_banner, filter_panel,    │
+│               result_card                             │
+├───────────────────────────────────────────────────────┤
+│  Playwright sync API                                  │
+└───────────────────────────────────────────────────────┘
 
 Side branch:
-  scripts/simulate_usage.py  ──> services/ ──> components/
-  (same services used by tests; framework is library-quality)
+  scripts/simulate_usage.py → services/ → components/
+  (same services as tests; framework is library-quality)
 ```
 
-### Why services on top of components
+**Layer rules.** Components own selectors and a single UI region.
+Services compose components into the spec flows and own business
+logic (pagination, price parsing, variant choice, money math).
+Tests call services and assert on return values. Components never
+contain business logic; tests never contain selectors.
 
-The four spec functions orchestrate across multiple pages and own business
-logic — pagination bounds, price parsing, random variant selection, money
-math (`Decimal`-only). Placing that on any one component breaks
-single-responsibility (a "cart page" that also knows how to walk search
-results is not a cart page anymore). Placing it in tests creates duplication
-across the smoke, regression, and data-driven suites. A services layer keeps
-each tier with one job: components know markup, services know flow, tests
-know assertions.
+**Money is `Decimal` end-to-end.** `db/data.yaml` quotes prices as
+strings so they enter Python via `Decimal(str(...))` without
+floating-point intermediate. The parser accepts the four currency
+anchors above.
 
-### Why YAML DB instead of .env
+**Locators prefer roles.** `get_by_role`, `get_by_label`,
+`get_by_text` first. CSS where eBay exposes no semantic anchor.
+XPath only where the brief explicitly required it
+(`SearchResultsPage.card_links_via_xpath()`). Full priority order
+in [`atlas/SELECTORS.md`](atlas/SELECTORS.md).
 
-Test scenarios, environment profiles, and demo narratives are structured,
-queryable, and shared across the regression suite, the data-driven runner,
-and `scripts/simulate_usage.py`. A single [`db/data.yaml`](db/data.yaml)
-holds all three tables under top-level keys (`environments`, `scenarios`,
-`demos`) — typed loaders (`db/models.py`) and accessor classes
-(`db.scenarios.where(tag=...)`) make the data first-class. `.env` is
-reserved for secrets, which on a public, guest-only site like eBay is
-mostly empty here. Money values (`max_price`) are quoted strings so they
-parse via `Decimal(str(...))` without ever touching `float`.
-
-### Locator strategy
-
-Role-based locators are first choice (`get_by_role`, `get_by_label`,
-`get_by_text`). CSS is fallback when the site exposes no semantic role
-(e.g. eBay's price node carries only a `data-testid`). XPath is reserved
-for the single case the brief explicitly requires it: the assignment asks
-to "retrieve the items using XPath," so `SearchResultsPage.card_links_via_xpath()`
-implements that retrieval path with an explicit, commented XPath expression,
-while the default search flow stays role/CSS-based for resilience.
-Cookie-banner dismissal and
-region/currency cookie pinning happen once in `tests/conftest.py` fixtures,
-not per-test. See [`atlas/SELECTORS.md`](atlas/SELECTORS.md) for the full
-priority order and per-component locator table.
-
-### Extension points
-
-To add a new flow: document it in [`atlas/FLOWS.md`](atlas/FLOWS.md), add a
-method on an existing service (or a new service if the flow spans a new
-domain), then either add a test under `tests/` or a scenario row in
-[`db/data.yaml`](db/data.yaml) under the `scenarios:` table — the data-driven runner picks it
-up automatically. Components rarely need to change because they cover the
-markup surface eBay actually exposes (4 pages, ~5 sub-components).
+**Data-driven.** Add a row to `db/data.yaml` `scenarios:` and the
+regression runner picks it up via `pytest_generate_tests`. No new
+test file needed.
 
 ## 3. Project Layout
 
 ```
 ebay-automation/
-├── README.md                          # this file
-├── CLAUDE.md                          # AI-session conventions
-├── ReadMeAIBugs.md                    # static review of AI-generated code
-├── pyproject.toml                     # deps, pytest config, ruff/black
-├── atlas/                             # spec documentation
-│   ├── PAGES.md                       #   URL patterns, roles, dynamic behaviors
-│   ├── FLOWS.md                       #   E2E flow specification
-│   ├── SELECTORS.md                   #   selector priority + per-component table
-│   └── EDGE_CASES.md                  #   cookie banners, geo, variants, currency
-├── db/                                # YAML store (config + scenario data)
-│   └── data.yaml                      #   environments, scenarios, demos under top-level keys
+├── README.md                        # this file
+├── CLAUDE.md                        # AI-session conventions
+├── ReadMeAIBugs.md                  # static review of AI-generated code
+├── pyproject.toml                   # deps, pytest config, ruff/black
+├── atlas/                           # spec docs
+│   ├── PAGES.md                     #   URLs, roles, dynamic behaviors
+│   ├── FLOWS.md                     #   E2E flow specification
+│   ├── SELECTORS.md                 #   locator priority + per-component table
+│   └── EDGE_CASES.md                #   cookie banners, geo, variants, currency
+├── db/
+│   └── data.yaml                    # environments, scenarios, demos
 ├── src/ebay_automation/
-│   ├── db/                            # TestDatabase + dataclass models
-│   ├── utils/                         # logger, ScreenshotManager, price_parser, paginator
-│   ├── components/                    # POM layer (BaseComponent + 9 regions)
-│   └── services/                      # business logic (auth, search, cart, variants)
+│   ├── db/                          # TestDatabase + dataclasses
+│   ├── utils/                       # logger, screenshots, parser, paginator
+│   ├── components/                  # POM layer (BaseComponent + 9 regions)
+│   └── services/                    # auth, search, cart, variants
 ├── tests/
-│   ├── conftest.py                    # fixtures: db, services, region cookies, Allure env
-│   ├── test_smoke.py                  # @smoke   — fast critical-path
-│   ├── test_search_under_price.py     # @regression — full E2E
-│   ├── test_data_driven.py            # @regression — parametrized from db/data.yaml (scenarios)
-│   └── unit/test_price_parser.py      # pure-Python parser tests (22 cases)
+│   ├── conftest.py                  # fixtures + region cookies + Allure env
+│   ├── test_smoke.py                # @smoke
+│   ├── test_search_under_price.py   # @regression — full E2E
+│   ├── test_data_driven.py          # @regression — parametrized from YAML
+│   └── unit/test_price_parser.py    # 32 parser cases, no browser
 ├── scripts/
-│   ├── init_env.sh                    # idempotent local bootstrap
-│   ├── simulate_usage.py              # headed demo of services outside pytest
-│   └── init_fresh_system.py           # connectivity probe; pattern for owned systems
-├── ai/prompts/                        # the 8 build prompts in order
-└── .github/workflows/regression.yml   # CI: chromium-headless on ubuntu-latest
+│   ├── init_env.sh                  # bootstrap (uv, chromium, JRE, allure)
+│   ├── simulate_usage.py            # headed demo runner
+│   └── init_fresh_system.py         # connectivity probe
+├── .claude/skills/                  # AI-assisted maintenance playbooks
+└── .github/workflows/regression.yml # CI + GitHub Pages deploy
 ```
 
 ## 4. Configuration
 
-**YAML DB.** Structural test data lives in [`db/data.yaml`](db/data.yaml)
-and is loaded via `TestDatabase`. Three top-level keys: `environments`
-maps a profile id (`dev`, `ci`) to browser/runtime knobs (headless,
-slow-mo, trace policy, region, currency, pagination cap); `scenarios`
-defines parameterised regression rows (query, max_price, limit,
-min_results, allow_partial, tags); `demos` carries the same shape plus a
-`narrative` field for the demo runner.
+`db/data.yaml` holds three tables under top-level keys:
 
-**Environment selection.** Profile is chosen via the `PROFILE` env var
-(default `dev`). `dev` is headed with slow-mo for watchability; `ci` is
-headless with tighter pagination and `retain-on-failure` traces.
-[`.env`](.env.example) is gitignored and reserved for secrets; eBay is
-public and guest-only, so it's mostly empty here.
+- `environments` — profile → browser knobs (headless, slow_mo, region,
+  currency, pagination cap)
+- `scenarios` — parametrized regression rows (query, max_price, limit,
+  min_results, allow_partial, tags)
+- `demos` — same shape + `narrative`, used by `simulate_usage.py`
+
+Profile is chosen with `PROFILE=`. Default `dev` is headed with
+slow-mo (watchable). `ci` is headless with tighter pagination.
+`.env` is reserved for secrets; eBay is guest-only here, so it's
+mostly empty.
 
 ## 5. Running Tests
 
 ```bash
-# Smoke (network-dependent, ~30s):
+# Smoke (~30 s, live eBay)
 uv run pytest -m smoke
 
-# Full regression (live eBay, several minutes):
+# Full regression (live eBay, several minutes)
 uv run pytest -m regression
 
-# Regression, 4 parallel workers:
+# Headless, 4 workers (CI profile)
 PROFILE=ci uv run pytest -m regression -n 4
 
-# Single test:
+# One test
 uv run pytest tests/test_search_under_price.py::test_full_e2e_search_add_assert
 
-# With trace recorded on failure (default in addopts; can override):
-uv run pytest -m regression --tracing=on
+# Unit tests (no browser, instant)
+uv run pytest tests/unit -v   # 32 parser cases
 
-# Allure report:
-uv run pytest -m regression --alluredir=allure-results
+# Allure report
 allure generate allure-results -o allure-report --clean
-allure open allure-report
-```
-
-Unit tests (pure Python, no browser) run instantly:
-
-```bash
-uv run pytest tests/unit -v   # 22 cases against price_parser
+allure open --host 0.0.0.0 -p 8080 allure-report
 ```
 
 ## 6. Reports
 
-`allure-results/` (raw JSON + the autogenerated `environment.properties`)
-and `allure-report/` (rendered HTML) are produced by every run.
-[`.github/workflows/regression.yml`](.github/workflows/regression.yml)
-uploads both, plus the Playwright `test-results/` folder (traces, videos,
-failure screenshots), as artifacts on every workflow run — including
-failed ones (`continue-on-error: true` on the test step). The latest run's
-artifacts are downloadable from the **Actions** tab in GitHub.
+Every run produces `allure-results/` (raw JSON + environment.properties)
+and `allure-report/` (rendered HTML). The CI workflow uploads both as
+artifacts and **deploys the HTML to GitHub Pages** on every push to
+main — the latest run is at the Pages URL on the repo's About panel.
 
-The Allure dashboard — suites, timeline, the Environment panel populated by
-`conftest.py`, and per-step screenshots — is downloadable from the
-**Actions** tab after any CI run, or viewable locally via
-`allure serve allure-results` (the `allure` CLI is installed by
-`scripts/init_env.sh`; if Java is missing, that step is skipped with
-instructions — `pytest` itself is unaffected).
+Per-step screenshots, Playwright traces, videos, and failure
+screenshots are attached automatically on test failure via the
+`addopts` in `pyproject.toml`. The Environment panel of the Allure
+report shows profile, region, base URL, Python version, and
+Playwright version (from `conftest.py::_allure_environment`).
 
 ## 7. Demo Mode
 
@@ -222,81 +164,90 @@ instructions — `pytest` itself is unaffected).
 uv run python scripts/simulate_usage.py
 ```
 
-Drives every demo scenario from [`db/data.yaml`](db/data.yaml) (`demos:` table)
-through the same `search → add-to-cart → assert-subtotal` flow as the
-regression suite, but headed (`PROFILE=dev`) and outside pytest. Its
-purpose is to prove the framework is library-quality: a sales demo or
-internal tool can reuse the exact services regression covers, with no
-fixture rig and no parallel implementation to maintain.
+Drives every `demos:` row in `db/data.yaml` through
+`search → add-to-cart → assert-subtotal`, headed and outside pytest.
+Proves the services layer is library-quality: a sales demo or
+internal tool can reuse the exact services regression covers.
 
 ## 8. CI
 
-The single workflow [`.github/workflows/regression.yml`](.github/workflows/regression.yml)
-runs on `push` to `main`, `pull_request` targeting `main`, and
-`workflow_dispatch`. It boots Python 3.11, installs `uv`, syncs deps,
-installs chromium with system libs, executes `pytest -m regression -n 4`
-with `PROFILE=ci`, generates an Allure HTML report, and uploads four
+`.github/workflows/regression.yml` runs on push to main, PRs, and
+manual dispatch. It installs deps, runs `pytest -m regression -n 4`
+under `PROFILE=ci`, generates the Allure HTML report, uploads four
 artifact bundles (`allure-results`, `allure-report`, `reports`,
-`test-results`) regardless of test outcome.
+`test-results`), and — on push to main — publishes `allure-report/`
+to GitHub Pages.
 
 ## 9. Assumptions and Limitations
 
-- **Guest auth only.** eBay's real login flow is gated by FunCaptcha /
-  hCaptcha; reliably automating it in CI is a moving target with a
-  credentials-storage burden out of proportion with this flow's needs.
-  The assignment explicitly allows a guest/stub approach. `AuthService`
-  pre-loads region + currency cookies and lands on the home page.
-- **ILS / Israel region by default.** Locale and currency are pinned via
-  cookie at the browser-context level (`db/data.yaml` `environments:`).
-  eBay localizes price text to the visitor's IP, so the parser handles
-  both `$`- and `ILS`-anchored amounts. To run against USD, change the
-  profile's `region`/`currency` and rescale `scenarios:` `max_price`
-  values — no code changes required.
-- **`/cart` full page blocked for IL guests during the shipping pause.**
-  Cart functionality itself is intact: clicking "Add to cart" updates
-  the header mini-cart dropdown correctly. Only the standalone `/cart`
-  URL is blocked — `https://www.ebay.com/cart` redirects to `/n/error`
-  (HTTP 404). The subtotal assertion reads from `/cart`, so it cannot
-  run in this state. `CartPage.is_unavailable()` detects the redirect
-  by URL marker; `CartService.assert_cart_total_not_exceeds` raises
-  `CartUnavailableError`; tests catch it and `pytest.skip` with the
-  landing URL in the reason. The search → filter → add-to-cart
-  pipeline runs end-to-end and the framework architecture is
-  unchanged; only the cart-subtotal assertion is environment-blocked.
-  Run from a US IP to exercise the full assertion.
-- **eBay markup is volatile.** Selectors prefer accessibility roles; CSS
-  is used only where eBay exposes no semantic anchor (price block,
-  result card); no XPath is required for the implemented flow.
-- **Pagination bounded.** `max_pages_to_paginate` in
-  `db/data.yaml` under `environments:` (default 5 / 3 for ci) caps the
-  search-with-price loop so a query that doesn't yield `limit` items
-  doesn't walk indefinitely.
-- **Variant selection is random.** When an item has variant pickers, the
-  service chooses a random in-stock option per combobox. Exhaustive
-  variant traversal is out of scope.
-- **Auctions are skipped, not failed.** A live auction listing has no
-  Add-to-Cart button; the cart service logs a warning and continues with
-  the remaining URLs. The data-driven test honors `allow_partial` from
-  the scenario row to decide whether a short result set is fatal.
+- **Guest auth only.** eBay's real login is gated by FunCaptcha /
+  hCaptcha; the assignment allows guest mode. `AuthService` pre-loads
+  region + currency cookies and lands on the home page.
+
+- **ILS / Israel region by default.** Locale and currency are pinned
+  in `db/data.yaml` `environments:` and via browser-context cookies.
+  Parser handles `$`, `ILS`, `₪`, `NIS`. Switch to USD by editing the
+  profile and rescaling scenario thresholds — no code change.
+
+- **Headless (`PROFILE=ci`) can hit Akamai.** eBay's edge challenges
+  some headless fingerprints with a "Checking your browser…"
+  interstitial; `Locator.fill` then times out on the search box. The
+  suite ships two non-deceptive reductions in `tests/conftest.py`:
+  `--disable-blink-features=AutomationControlled` and an explicit
+  Chrome user-agent. Sufficient on most CI runners and clean
+  residential IPs. The headed `dev` profile is the reliable local
+  path. Long-term fix: fixture replay
+  (see `.claude/skills/fixture-recorder/SKILL.md`).
+
+- **Cart lives at `cart.ebay.com`.** The legacy `www.ebay.com/cart`
+  path is deprecated and 302s to a route that 404s in some regions.
+  `CartPage.URL_PATH` points at the subdomain, which works for
+  guests in all regions tested. The cart-page subtotal uses the `₪`
+  Unicode shekel sign, so the parser anchors include it. As a
+  defensive safety net, `CartPage.is_unavailable()` detects the
+  `/n/error` redirect and `CartService` raises `CartUnavailableError`
+  — tests `pytest.skip` with the URL in the reason instead of failing
+  opaquely. In normal operation the safety net never fires.
+
+- **eBay markup is volatile.** Selectors prefer accessibility roles;
+  CSS only where eBay exposes no role; no XPath in the default flow.
+
+- **Pagination bounded.** `max_pages_to_paginate` (default 5 / 3 for
+  ci) caps the search loop. A query that doesn't yield `limit` items
+  won't walk indefinitely.
+
+- **Variant selection is random.** When an item has variant pickers,
+  the service picks a random in-stock option. Exhaustive variant
+  traversal is out of scope.
+
+- **Auctions are skipped, not failed.** Auctions have no Add-to-Cart
+  button; the cart service logs and continues. The data-driven test
+  honors `allow_partial` to decide whether a short result is fatal.
 
 ## 10. AI-Assisted Development
 
-This repository was built using Claude Code with an atlas-driven approach.
-[`atlas/`](atlas/) describes the *system under test* (pages, flows,
-selectors, edge cases) so the AI doesn't have to infer eBay's structure
-from scratch each turn. [`CLAUDE.md`](CLAUDE.md) encodes per-session
-conventions and anti-patterns (no `time.sleep`, no selectors in tests,
-`Decimal`-only money, layer boundaries). [`ai/prompts/`](ai/prompts/)
-holds the eight build prompts used to generate each layer, in order —
-`01_scaffold.md` through `08_documentation.md`, with an extra
-`00_cleanup.md` capturing the mid-stream scope reduction.
+Built with Claude Code using an atlas-driven approach. The `atlas/`
+docs describe the system under test (pages, flows, selectors, edge
+cases) so the AI doesn't re-derive eBay's structure every session.
+`CLAUDE.md` encodes the per-session conventions (no `time.sleep`, no
+selectors in tests, `Decimal` only, layer boundaries). `ai/prompts/`
+holds the eight build prompts that produced each layer, in order.
 
-Every prompt is a design-by-contract specification: file paths, class
-names, method signatures, behavior, and verification commands —
-implementation is delegated to the tool. The senior judgment lives in
-the design, not in the typing. [`ReadMeAIBugs.md`](ReadMeAIBugs.md)
-applies the same lens to AI-generated test code that *didn't* go through
-that discipline — a static review of five concrete failure modes.
+`.claude/skills/` codifies the maintenance loop as five focused
+playbooks:
+
+| Skill | When it fires |
+|---|---|
+| **qa-debug** | A `Locator` timeout / strict-mode failure → triage existing artifacts, then patch the `_SEL_*` constant |
+| **flake-triage** | Classifies a failure as DRIFT / ENVIRONMENT / NETWORK / TRANSIENT / TEST-ASSUMPTION before any code is touched |
+| **add-scenario** | New regression case → YAML row, ILS rescale, validation |
+| **atlas-sync** | After several selector patches, audit doc vs code |
+| **fixture-recorder** | Convert a flake-prone live test to offline replay via `page.route` |
+
+The skills are the playbook; the architecture is the artifact.
+`ReadMeAIBugs.md` is a static review of AI-generated test code that
+did **not** go through this discipline — a control case showing
+five concrete failure modes.
 
 ## 11. Bug Review
 

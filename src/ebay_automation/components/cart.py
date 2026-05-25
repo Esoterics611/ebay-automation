@@ -9,16 +9,19 @@ from ebay_automation.utils.price_parser import parse_price
 
 
 class CartPage(BaseComponent):
-    """Shopping cart page (``/cart``)."""
+    """Shopping cart page. Lives on the ``cart.ebay.com`` subdomain — the
+    legacy ``www.ebay.com/cart`` path 302s to ``pages.ebay.com/cart``
+    which then 404s in some regions (notably IL during the 2024+
+    shipping pause). The cart subdomain works for guests in all
+    regions tested."""
 
-    URL_PATH = "/cart"
+    URL_PATH = "https://cart.ebay.com/"
     _SEL_SUBTOTAL_TEXT = re.compile(r"^Subtotal", re.I)
     _SEL_LINE_ITEM_CSS = "[data-testid='cart-item'], li.cart-item, [data-listitemid]"
-    # eBay redirects /cart to /n/error (HTTP 404) when guest cart is
-    # disabled for the visitor's region — observed during the 2024+
-    # Israel shipping pause. The URL substring is the most reliable
-    # signal because the error page is otherwise styled like a normal
-    # eBay page (header, footer, search).
+    # Safety net: if eBay ever routes us to its error page again
+    # (regional block, deprecated route, etc.), this URL substring is
+    # the most reliable signal because the error page is otherwise
+    # styled like a normal eBay page.
     _ERROR_URL_MARKER = "/n/error"
 
     def __init__(self, page: Page) -> None:

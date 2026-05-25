@@ -61,9 +61,10 @@ class CartService(BaseService):
     ) -> None:
         """Open the cart, capture state, parse the subtotal as Decimal,
         and assert it is ``<= budget_per_item * items_count``. Raises
-        ``CartUnavailableError`` when eBay redirects to an error page
-        (guest cart disabled in this region), or ``AssertionError``
-        with a structured message when the subtotal exceeds budget."""
+        ``CartUnavailableError`` if the cart navigation lands on
+        eBay's ``/n/error`` route (safety net for regional blocks or
+        deprecated URL routing), or ``AssertionError`` with a
+        structured message when the subtotal exceeds budget."""
         self._cart.open()
         if self._cart.is_unavailable():
             raise CartUnavailableError(

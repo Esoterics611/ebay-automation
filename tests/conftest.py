@@ -51,14 +51,34 @@ def base_url(env: Environment) -> str:
 # ---------- playwright launch / context overrides ----------
 
 
+# Chromium launch args that reduce automation fingerprinting against
+# bot-aware sites (eBay's Akamai layer). These are well-known, non-
+# deceptive measures — they remove signals that Chromium volunteers
+# *only* when driven by automation tools, not signals that lie about
+# what the browser is. Without these, PROFILE=ci is challenged by an
+# Akamai interstitial ("Checking your browser…") and Locator.fill
+# times out on the search box. See README §Assumptions.
+_ANTI_DETECTION_ARGS = [
+    "--disable-blink-features=AutomationControlled",
+]
+# A real Chrome user-agent. The default Playwright UA in headless
+# mode includes "HeadlessChrome", which Akamai flags immediately.
+_CHROME_UA = (
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+)
+
+
 @pytest.fixture(scope="session")
 def browser_type_launch_args(
     browser_type_launch_args: dict[str, Any], env: Environment
 ) -> dict[str, Any]:
+    existing_args = list(browser_type_launch_args.get("args", []))
     return {
         **browser_type_launch_args,
         "headless": env.headless,
         "slow_mo": env.slow_mo_ms,
+        "args": existing_args + _ANTI_DETECTION_ARGS,
     }
 
 
@@ -72,6 +92,7 @@ def browser_context_args(browser_context_args: dict[str, Any], env: Environment)
         "base_url": env.base_url,
         "locale": f"en-{env.region}",
         "viewport": {"width": 1440, "height": 900},
+        "user_agent": _CHROME_UA,
     }
 
 

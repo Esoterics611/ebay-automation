@@ -88,9 +88,10 @@ the Add-to-Cart / Buy-It-Now CTAs.
 
 ---
 
-## Cart — `https://www.ebay.com/cart`
+## Cart — `https://cart.ebay.com/`
 
-**URL pattern:** `/cart`
+**URL pattern:** `https://cart.ebay.com/` (absolute; the cart lives on
+its own subdomain, not under `www.ebay.com`)
 
 **Purpose:** Review items pending checkout and read the subtotal we assert
 against.
@@ -113,8 +114,9 @@ against.
 - Currency follows the visitor's region (ILS for IL; USD for US, etc.);
   the price parser anchors on both `$` and `ILS`. Scenario thresholds
   in `db/data.yaml` are in ILS by default — see README §Currency.
-- **Region-disabled `/cart`:** during shipping pauses (observed for IL
-  in 2024+), navigating to `/cart` redirects guests to `/n/error`
-  (HTTP 404), even though `Add to cart` still updates the header
-  mini-cart dropdown. `CartPage.is_unavailable()` detects this; see
-  EDGE_CASES.md for the strategy.
+- **The cart URL is `cart.ebay.com`, not `www.ebay.com/cart`.** The
+  legacy `/cart` path on the main domain is deprecated — it 302s to
+  `pages.ebay.com/cart` which 404s on `/n/error` in some regions.
+  `CartPage` points at the subdomain. `CartPage.is_unavailable()`
+  remains as a safety net for the `/n/error` redirect; see
+  EDGE_CASES.md for full strategy and parser handling of `₪`.

@@ -35,6 +35,13 @@ from ebay_automation.utils.price_parser import parse_price
         ("ILS 1,486.79", Decimal("1486.79")),
         ("ILS 25 to ILS 30", Decimal("25")),
         ("+ILS 75.00 delivery", Decimal("75.00")),
+        # ₪ (Unicode shekel sign, U+20AA) — used on the cart page
+        ("₪332.48", Decimal("332.48")),
+        ("₪ 332.48", Decimal("332.48")),
+        ("₪ 1,486.79", Decimal("1486.79")),
+        ("Subtotal ₪332.48", Decimal("332.48")),
+        # NIS legacy form (rarer; some widgets still emit it)
+        ("NIS 50", Decimal("50")),
     ],
 )
 def test_parse_price_valid(text: str, expected: Decimal) -> None:

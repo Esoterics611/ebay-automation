@@ -1,12 +1,14 @@
 import re
 from decimal import Decimal
 
-# Matches either a $-anchored amount or an ILS-anchored amount. The
-# tests in this suite run against eBay's ILS-localized SRP (see README
-# §"Currency"); the $-form is retained so the parser stays useful on
-# USD-localized runs and on cart copy that still says "$".
+# Matches a $-, ILS-, ₪-, or NIS-anchored amount. eBay shows ILS prices
+# in three forms on different surfaces: "ILS 356.56" on the SRP, "₪
+# 332.48" on the cart page (Unicode shekel sign U+20AA), and "NIS …"
+# occasionally on legacy widgets. The $-form is retained for
+# USD-localized runs and cart copy that still uses "$". See README
+# §Currency and atlas/EDGE_CASES.md.
 _PRICE_AMOUNT = re.compile(
-    r"(?:\$|ILS)\s*(-?\d{1,3}(?:,\d{3})*(?:\.\d+)?)"
+    r"(?:\$|ILS|₪|NIS)\s*(-?\d{1,3}(?:,\d{3})*(?:\.\d+)?)"
 )
 
 
@@ -21,6 +23,9 @@ def parse_price(text: str) -> Decimal:
         "$1,234.56"                 → Decimal("1234.56")
         "ILS 356.56"                → Decimal("356.56")
         "ILS 1,486.79"              → Decimal("1486.79")
+        "₪332.48"                   → Decimal("332.48")  (cart page)
+        "₪ 1,486.79"                → Decimal("1486.79")
+        "Subtotal ₪332.48"          → Decimal("332.48")
         "ILS 25 to ILS 30"          → Decimal("25")     (lower bound)
         "$25.00 to $30.00"          → Decimal("25.00")  (lower bound)
         "Subtotal (3 items) $50.00" → Decimal("50.00")  (currency anchor

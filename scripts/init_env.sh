@@ -127,7 +127,11 @@ cat <<'EOF'
 Environment ready.
 Run regression:   PROFILE=ci uv run pytest -m regression -n 4 --alluredir=allure-results
 Run simulation:   uv run python scripts/simulate_usage.py
-View Allure:      allure serve allure-results
-                  (allure + portable JRE installed under ~/.local/; the launcher at
-                   ~/.local/bin/allure resolves java automatically)
+View Allure:      allure serve --host 0.0.0.0 -p 8080 allure-results
+                  then open http://localhost:8080 in your browser.
+                  The --host flag is required on WSL2 — without it Allure binds
+                  to 127.0.1.1 (the WSL hostname alias), which Windows cannot
+                  reach. The "Browse action not supported" stack trace from
+                  Allure is non-fatal — it means Java can't auto-launch a
+                  browser in a headless shell; the server is still serving.
 EOF

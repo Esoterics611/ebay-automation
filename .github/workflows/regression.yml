@@ -6,6 +6,17 @@ on:
     branches: [main]
   workflow_dispatch:
 
+# GitHub Pages publishing needs these permissions at the workflow level.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Only one Pages deployment can be in flight at a time per environment.
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
 jobs:
   regression-chromium-headless:
     runs-on: ubuntu-latest
@@ -27,9 +38,9 @@ jobs:
         continue-on-error: true
       - name: Install Allure CLI
         run: |
-          curl -o allure-2.27.0.tgz -Ls https://github.com/allure-framework/allure2/releases/download/2.27.0/allure-2.27.0.tgz
-          tar -xzf allure-2.27.0.tgz
-          echo "$PWD/allure-2.27.0/bin" >> $GITHUB_PATH
+          curl -o allure-2.30.0.tgz -Ls https://github.com/allure-framework/allure2/releases/download/2.30.0/allure-2.30.0.tgz
+          tar -xzf allure-2.30.0.tgz
+          echo "$PWD/allure-2.30.0/bin" >> $GITHUB_PATH
       - name: Generate Allure HTML report
         run: allure generate allure-results --clean -o allure-report
       - name: Upload Allure results
@@ -39,7 +50,7 @@ jobs:
           name: allure-results
           path: allure-results/
           retention-days: 14
-      - name: Upload Allure HTML report
+      - name: Upload Allure HTML report (artifact)
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -60,3 +71,18 @@ jobs:
           name: test-results
           path: test-results/
           retention-days: 14
+
+      # ---- GitHub Pages publish ----
+      # Only on push to main (PRs from forks cannot deploy Pages).
+      - name: Configure Pages
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/configure-pages@v5
+      - name: Upload Pages artifact
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: allure-report/
+      - name: Deploy to GitHub Pages
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        id: deployment
+        uses: actions/deploy-pages@v4
