@@ -1,6 +1,8 @@
 # eBay Automation Suite
 
-[![regression](https://github.com/vanguard-dao/ebay-automation/actions/workflows/regression.yml/badge.svg)](https://github.com/vanguard-dao/ebay-automation/actions/workflows/regression.yml)
+[![regression](https://github.com/Esoterics611/ebay-automation/actions/workflows/regression.yml/badge.svg)](https://github.com/Esoterics611/ebay-automation/actions/workflows/regression.yml)
+
+**Live Allure report:** <https://esoterics611.github.io/ebay-automation/>
 
 End-to-end Playwright + pytest suite for ebay.com. Implements the four
 spec functions — guest auth, search-with-price-cap, add-to-cart,
