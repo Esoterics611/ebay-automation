@@ -1,0 +1,6 @@
+2026-05-24 15:23:13,021 [INFO] ebay_automation.AuthService — guest session: region=IL currency=ILS
+2026-05-24 15:23:18,725 [INFO] ebay_automation.SearchService — search start: query='vintage postcard' max_price=60.00 limit=15
+2026-05-24 15:23:46,790 [INFO] ebay_automation.paginator — paginator: page=1 collected_this_page=0 total=0 target=15
+2026-05-24 15:23:46,799 [INFO] ebay_automation.paginator — paginator: no next page after page 1
+2026-05-24 15:23:46,800 [INFO] ebay_automation.SearchService — search done: collected=0 target=15
+2026-05-24 15:23:53,571 [WARNING] ebay_automation.test_data_driven — scenario regression-vintage-postcards: collected 0/15 urls; proceeding (allow_partial=True)

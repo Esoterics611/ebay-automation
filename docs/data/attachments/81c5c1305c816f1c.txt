@@ -1,0 +1,2 @@
+2026-05-24 13:49:32,050 [INFO] ebay_automation.AuthService — guest session: region=US currency=USD
+2026-05-24 13:49:35,866 [INFO] ebay_automation.SearchService — search start: query='vintage postcard' max_price=20.00 limit=15

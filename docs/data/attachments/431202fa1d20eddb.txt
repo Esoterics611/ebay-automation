@@ -1,0 +1,5 @@
+2026-05-24 15:23:12,969 [INFO] ebay_automation.AuthService — guest session: region=IL currency=ILS
+2026-05-24 15:23:18,611 [INFO] ebay_automation.SearchService — search start: query='leather wallet' max_price=90.00 limit=8
+2026-05-24 15:23:51,081 [INFO] ebay_automation.paginator — paginator: page=1 collected_this_page=0 total=0 target=8
+2026-05-24 15:23:51,110 [INFO] ebay_automation.paginator — paginator: no next page after page 1
+2026-05-24 15:23:51,110 [INFO] ebay_automation.SearchService — search done: collected=0 target=8

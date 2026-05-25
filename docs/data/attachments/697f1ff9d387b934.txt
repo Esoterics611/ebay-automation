@@ -1,0 +1,5 @@
+2026-05-24 15:23:12,975 [INFO] ebay_automation.AuthService — guest session: region=IL currency=ILS
+2026-05-24 15:23:18,641 [INFO] ebay_automation.SearchService — search start: query='bluetooth speaker' max_price=150.00 limit=10
+2026-05-24 15:23:44,511 [INFO] ebay_automation.paginator — paginator: page=1 collected_this_page=0 total=0 target=10
+2026-05-24 15:23:44,546 [INFO] ebay_automation.paginator — paginator: no next page after page 1
+2026-05-24 15:23:44,547 [INFO] ebay_automation.SearchService — search done: collected=0 target=10

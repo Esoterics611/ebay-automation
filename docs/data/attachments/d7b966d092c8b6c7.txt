@@ -1,0 +1,2 @@
+2026-05-24 20:11:24,222 [INFO] ebay_automation.AuthService — guest session: region=IL currency=ILS
+2026-05-24 20:11:26,649 [INFO] ebay_automation.SearchService — search start: query='leather wallet' max_price=90.00 limit=8

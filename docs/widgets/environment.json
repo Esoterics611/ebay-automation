@@ -1,0 +1,1 @@
+[{"values":["3.12.3"],"name":"python.version"},{"values":["1.60.0"],"name":"playwright.version"},{"values":["dev"],"name":"profile"},{"values":["https://www.ebay.com"],"name":"base_url"},{"values":["IL"],"name":"region"},{"values":["False"],"name":"headless"}]

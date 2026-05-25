@@ -1,0 +1,2 @@
+2026-05-24 12:10:51,445 [INFO] ebay_automation.AuthService — guest session: region=US currency=USD
+2026-05-24 12:10:55,592 [INFO] ebay_automation.SearchService — search start: query='bluetooth speaker' max_price=50.00 limit=10
